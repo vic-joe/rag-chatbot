@@ -1,0 +1,44 @@
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+*.pfx
+*.crt
+*.cert
+*secret*
+*credentials*
+
+# Python
+venv/
+.venv/
+env/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Runtime data
+uploads/
+logs/
+*.log
+*.sqlite
+*.sqlite3
+*.db
+
+# Frontend dependencies and builds
+node_modules/
+rag-frontend/node_modules/
+rag-frontend/dist/
+dist/
+dist-ssr/
+
+# Local editor and OS files
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
