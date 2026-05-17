@@ -4,8 +4,9 @@ export default function LoginForm({ onLogin }) {
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
     const [error, setError] = useState("");
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
-    const handleSubmit = (event) => {
+    const handleSubmit = async (event) => {
         event.preventDefault();
         setError("");
 
@@ -15,9 +16,12 @@ export default function LoginForm({ onLogin }) {
         }
 
         try {
-            onLogin(username, password);
+            setIsSubmitting(true);
+            await onLogin(username, password);
         } catch (loginError) {
             setError(loginError.message || "Invalid credentials.");
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -39,7 +43,7 @@ export default function LoginForm({ onLogin }) {
                             setError("");
                         }}
                         autoComplete="username"
-                        placeholder="admin"
+                        placeholder="Enter username"
                         required
                     />
                 </label>
@@ -62,7 +66,9 @@ export default function LoginForm({ onLogin }) {
 
             {error && <p className="form-error" role="alert">{error}</p>}
 
-            <button type="submit">Sign in to dashboard</button>
+            <button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? "Signing in..." : "Sign in to dashboard"}
+            </button>
         </form>
     );
 }

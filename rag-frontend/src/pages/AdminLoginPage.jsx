@@ -11,8 +11,8 @@ export default function AdminLoginPage() {
         }
     }, []);
 
-    const handleLogin = (username, password) => {
-        loginAdmin(username, password);
+    const handleLogin = async (username, password) => {
+        await loginAdmin(username, password);
         window.history.replaceState({}, "", "/admin/dashboard");
         window.dispatchEvent(new PopStateEvent("popstate"));
     };

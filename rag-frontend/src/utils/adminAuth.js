@@ -1,3 +1,5 @@
+import { API_BASE } from "../api/chatApi";
+
 const ADMIN_SESSION_KEY = "ragAdminSession";
 const ADMIN_TOKEN_TTL_SECONDS = 60 * 60 * 8;
 
@@ -15,11 +17,12 @@ function base64UrlDecode(value) {
     return JSON.parse(window.atob(padded));
 }
 
-function createJwtLikeToken(username) {
+function createJwtLikeToken(user) {
     const now = Math.floor(Date.now() / 1000);
     const header = base64UrlEncode({ alg: "HS256", typ: "JWT" });
     const payload = base64UrlEncode({
-        sub: username,
+        sub: String(user.id),
+        username: user.username,
         role: "admin",
         iat: now,
         exp: now + ADMIN_TOKEN_TTL_SECONDS,
@@ -65,16 +68,39 @@ export function isAdminAuthenticated() {
     }
 }
 
-export function loginAdmin(username, password) {
-    const normalizedUsername = username.trim().toLowerCase();
+function formatAuthError(data) {
+    if (typeof data?.detail === "string") {
+        return data.detail;
+    }
 
-    if (normalizedUsername !== "admin" || password !== "admin") {
-        throw new Error("Invalid admin credentials.");
+    return "Invalid admin credentials.";
+}
+
+export async function loginAdmin(username, password) {
+    let res;
+
+    try {
+        res = await fetch(`${API_BASE}/api/auth/login`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ username, password }),
+        });
+    } catch {
+        throw new Error("Cannot reach the backend server. Make sure FastAPI is running on http://localhost:8000.");
+    }
+
+    const data = await res.json();
+
+    if (!res.ok) {
+        throw new Error(formatAuthError(data));
     }
 
     const session = {
-        username: normalizedUsername,
-        token: createJwtLikeToken(normalizedUsername),
+        id: data.id,
+        username: data.username,
+        token: createJwtLikeToken(data),
     };
 
     window.localStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify(session));
