@@ -34,7 +34,7 @@ export default function ChatInput({ onSend, disabled = false }) {
                 disabled={disabled}
             />
             <button type="submit" disabled={disabled || !text.trim()} aria-label="Send message">
-                ↑
+                ^
             </button>
         </form>
     );

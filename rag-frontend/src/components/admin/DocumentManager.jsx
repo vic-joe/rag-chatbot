@@ -10,7 +10,7 @@ const emptyForm = {
     source: "",
 };
 
-export default function DocumentManager({ refreshKey = 0 }) {
+export default function DocumentManager({ refreshKey = 0, onChanged }) {
     const [documents, setDocuments] = useState([]);
     const [form, setForm] = useState(emptyForm);
     const [editingId, setEditingId] = useState(null);
@@ -87,6 +87,7 @@ export default function DocumentManager({ refreshKey = 0 }) {
             setStatusType("success");
             resetForm();
             await loadDocuments({ clearStatus: false });
+            onChanged?.();
         } catch (error) {
             setStatus(error.message);
             setStatusType("error");
@@ -122,6 +123,7 @@ export default function DocumentManager({ refreshKey = 0 }) {
             setStatus("Document deleted.");
             setStatusType("success");
             await loadDocuments({ clearStatus: false });
+            onChanged?.();
         } catch (error) {
             setStatus(error.message);
             setStatusType("error");
@@ -190,7 +192,7 @@ export default function DocumentManager({ refreshKey = 0 }) {
 
             <div className="document-list">
                 {documents.length === 0 && !isLoading ? (
-                    <p className="empty-documents">No documents found yet. Use Upload to add PDF or DOCX files.</p>
+                    <p className="empty-documents">No documents found yet. Use Upload to add PDF, DOCX, or TXT files.</p>
                 ) : (
                     documents.map((document) => (
                         <article className="document-row" key={document.id}>

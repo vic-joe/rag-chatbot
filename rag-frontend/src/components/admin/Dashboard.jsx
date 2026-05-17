@@ -1,64 +1,48 @@
-import { useState } from "react";
-import DocumentManager from "./DocumentManager";
-import UploadCard from "./UploadCard";
+const cards = [
+    { key: "documents", label: "Documents", helper: "Uploaded source files" },
+    { key: "chunks", label: "Vector chunks", helper: "Searchable embeddings" },
+    { key: "sources", label: "Unique sources", helper: "Distinct indexed files" },
+];
 
-export default function Dashboard() {
-    const [refreshKey, setRefreshKey] = useState(0);
-    const [activeSection, setActiveSection] = useState("documents");
-    const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-
+export default function Dashboard({ stats }) {
     return (
-        <div className={`admin-page ${isSidebarOpen ? "sidebar-open" : "sidebar-closed"}`}>
-            <aside className="admin-sidebar">
-                <button
-                    type="button"
-                    className="sidebar-toggle admin-sidebar-toggle"
-                    onClick={() => setIsSidebarOpen((value) => !value)}
-                    aria-label={isSidebarOpen ? "Close admin sidebar" : "Open admin sidebar"}
-                    title={isSidebarOpen ? "Close sidebar" : "Open sidebar"}
-                >
-                    <span className="sidebar-toggle-icon" aria-hidden="true">
-                        <span />
-                        <span />
-                    </span>
-                </button>
-
-                {isSidebarOpen && (
-                    <div className="admin-sidebar-content">
-                        <div>
-                            <p className="eyebrow">Admin</p>
-                            <h1>Control room</h1>
-                        </div>
-
-                        <nav className="admin-side-nav" aria-label="Admin sections">
-                            <button
-                                type="button"
-                                className={activeSection === "documents" ? "active" : ""}
-                                onClick={() => setActiveSection("documents")}
-                            >
-                                <span>Documents</span>
-                                <small>Review, edit, delete</small>
-                            </button>
-                            <button
-                                type="button"
-                                className={activeSection === "upload" ? "active" : ""}
-                                onClick={() => setActiveSection("upload")}
-                            >
-                                <span>Upload</span>
-                                <small>Add PDF or DOCX</small>
-                            </button>
-                        </nav>
-                    </div>
-                )}
-            </aside>
-
-            <div className="admin-content">
-                {activeSection === "documents" ? (
-                    <DocumentManager refreshKey={refreshKey} />
-                ) : (
-                    <UploadCard onUploaded={() => setRefreshKey((value) => value + 1)} />
-                )}
+        <section className="dashboard-overview">
+            <div className="dashboard-card-grid">
+                {cards.map((card) => (
+                    <article className="dashboard-stat-card" key={card.key}>
+                        <p>{card.label}</p>
+                        <strong>{stats.isLoading ? "..." : stats[card.key]}</strong>
+                        <span>{card.helper}</span>
+                    </article>
+                ))}
             </div>
-        </div>
+
+            <div className="dashboard-panel-grid">
+                <article className="admin-panel">
+                    <div>
+                        <p className="eyebrow">Knowledge workflow</p>
+                        <h3>Document operations</h3>
+                    </div>
+                    <div className="workflow-list">
+                        <span>Upload PDF, DOCX, or TXT files</span>
+                        <span>Chunk and embed content</span>
+                        <span>Review indexed document groups</span>
+                        <span>Serve answers through the public chatbot</span>
+                    </div>
+                </article>
+
+                <article className="admin-panel">
+                    <div>
+                        <p className="eyebrow">Vector database</p>
+                        <h3>{stats.error ? "Connection issue" : "Index operational"}</h3>
+                    </div>
+                    <p className="panel-copy">
+                        {stats.error
+                            ? stats.error
+                            : "The document index is reachable and ready for semantic retrieval."}
+                    </p>
+                </article>
+            </div>
+        </section>
     );
 }

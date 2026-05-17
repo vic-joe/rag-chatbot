@@ -18,10 +18,17 @@ def load_docx(file_path: str) -> str:
     return "\n".join(text)
 
 
+def load_txt(file_path: str) -> str:
+    with open(file_path, "r", encoding="utf-8", errors="ignore") as file:
+        return file.read()
+
+
 def load_document(file_path: str, file_type: str) -> str:
     if file_type == "pdf":
         return load_pdf(file_path)
     elif file_type == "docx":
         return load_docx(file_path)
+    elif file_type == "txt":
+        return load_txt(file_path)
     else:
         raise ValueError("Unsupported file type")

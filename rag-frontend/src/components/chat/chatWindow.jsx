@@ -250,7 +250,7 @@ export default function ChatWindow() {
                                                 }}
                                                 aria-label="Close login form"
                                             >
-                                                ×
+                                                x
                                             </button>
                                         </div>
                                         <label>

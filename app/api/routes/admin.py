@@ -247,8 +247,8 @@ async def upload_document(
 
     filename = os.path.basename(file.filename).lower()
 
-    if not filename.endswith((".pdf", ".docx")):
-        raise HTTPException(status_code=400, detail="Only PDF and DOCX allowed")
+    if not filename.endswith((".pdf", ".docx", ".txt")):
+        raise HTTPException(status_code=400, detail="Only PDF, DOCX, and TXT allowed")
 
     file_ext = filename.split(".")[-1]
 

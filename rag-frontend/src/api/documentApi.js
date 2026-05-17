@@ -1,27 +1,53 @@
 import { API_BASE } from "./chatApi";
+import { getAdminToken } from "../utils/adminAuth";
 
-export async function uploadDocument(file) {
+export async function uploadDocument(file, onProgress) {
     const formData = new FormData();
     formData.append("file", file);
 
-    const res = await fetch(`${API_BASE}/api/admin/documents/`, {
-        method: "POST",
-        body: formData,
+    return new Promise((resolve, reject) => {
+        const request = new XMLHttpRequest();
+        request.open("POST", `${API_BASE}/api/admin/documents/`);
+
+        const token = getAdminToken();
+        if (token) {
+            request.setRequestHeader("Authorization", `Bearer ${token}`);
+        }
+
+        request.upload.onprogress = (event) => {
+            if (!event.lengthComputable) return;
+            const nextProgress = Math.round((event.loaded / event.total) * 80);
+            onProgress?.(Math.max(8, nextProgress));
+        };
+
+        request.onload = () => {
+            let data;
+
+            try {
+                data = JSON.parse(request.responseText);
+            } catch {
+                data = { detail: request.responseText };
+            }
+
+            if (request.status >= 200 && request.status < 300) {
+                onProgress?.(100);
+                resolve(data);
+                return;
+            }
+
+            reject(new Error(data.detail || "Document upload failed"));
+        };
+
+        request.onerror = () => reject(new Error("Document upload failed. Make sure the backend server is running."));
+        request.send(formData);
     });
-
-    const data = await res.json();
-
-    if (!res.ok) {
-        throw new Error(data.detail || "Document upload failed");
-    }
-
-    return data;
 }
 
 async function requestDocument(path, options = {}) {
     const res = await fetch(`${API_BASE}/api/admin${path}`, {
         headers: options.body instanceof FormData ? undefined : {
             "Content-Type": "application/json",
+            ...(getAdminToken() ? { Authorization: `Bearer ${getAdminToken()}` } : {}),
         },
         ...options,
     });
