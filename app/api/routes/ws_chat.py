@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
+from typing import Dict, List
 
 from app.api.deps import get_rag_pipeline
 from app.db.models import ChatMessage, ChatSession
@@ -35,6 +36,54 @@ def save_chat_exchange(
     return True
 
 
+def load_chat_history(
+    db: Session,
+    user_id: int,
+    session_id: int,
+    limit: int = 12,
+) -> List[Dict[str, str]]:
+    session = (
+        db.query(ChatSession)
+        .filter(ChatSession.id == session_id, ChatSession.user_id == user_id)
+        .first()
+    )
+
+    if not session:
+        return []
+
+    messages = (
+        db.query(ChatMessage)
+        .filter(ChatMessage.session_id == session_id)
+        .order_by(ChatMessage.id.desc())
+        .limit(limit)
+        .all()
+    )
+
+    return [
+        {"role": message.role, "content": message.content}
+        for message in reversed(messages)
+    ]
+
+
+def normalize_payload_history(history: object, limit: int = 12) -> List[Dict[str, str]]:
+    if not isinstance(history, list):
+        return []
+
+    normalized = []
+
+    for item in history[-limit:]:
+        if not isinstance(item, dict):
+            continue
+
+        role = item.get("role")
+        content = str(item.get("content", "")).strip()
+
+        if role in {"user", "assistant"} and content:
+            normalized.append({"role": role, "content": content})
+
+    return normalized
+
+
 @router.websocket("/ws/chat/{user_id}")
 async def websocket_chat(
     websocket: WebSocket,
@@ -57,8 +106,18 @@ async def websocket_chat(
                 continue
 
             assistant_response = ""
+            chat_history = normalize_payload_history(payload.get("history"))
 
-            async for token in rag_pipeline.stream(message):
+            if session_id:
+                db = SessionLocal()
+                try:
+                    chat_history = load_chat_history(db, int(user_id), int(session_id))
+                except (TypeError, ValueError):
+                    chat_history = []
+                finally:
+                    db.close()
+
+            async for token in rag_pipeline.stream(message, chat_history=chat_history):
                 assistant_response += token
                 await websocket.send_json({
                     "type": "stream",

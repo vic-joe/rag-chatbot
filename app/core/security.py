@@ -33,3 +33,14 @@ def verify_password(password: str, password_hash: str) -> bool:
         return False
 
     return hmac.compare_digest(digest.hex(), digest_hex)
+
+
+def is_password_hash(password_hash: str) -> bool:
+    return isinstance(password_hash, str) and password_hash.startswith("pbkdf2_sha256$")
+
+
+def verify_legacy_plaintext_password(password: str, stored_password: str) -> bool:
+    if not isinstance(stored_password, str) or is_password_hash(stored_password):
+        return False
+
+    return hmac.compare_digest(password, stored_password)

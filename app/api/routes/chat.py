@@ -91,7 +91,7 @@ def chat(
     try:
         # ✅ Debug Mode
         if debug:
-            result = rag_pipeline.run_debug(request.message)
+            result = rag_pipeline.run_debug(request.message, chat_history=request.history)
 
             return {
                 "response": result["answer"],
@@ -100,7 +100,7 @@ def chat(
             }
 
         # ✅ Normal Mode
-        result = rag_pipeline.run(request.message)
+        result = rag_pipeline.run(request.message, chat_history=request.history)
 
         return ChatResponse(
             response=result["answer"],
@@ -134,7 +134,7 @@ async def chat_stream(
 
     async def event_generator():
         try:
-            async for token in rag_pipeline.stream(request.message):
+            async for token in rag_pipeline.stream(request.message, chat_history=request.history):
                 yield token
         except Exception as e:
             yield f"[ERROR]: {str(e)}"

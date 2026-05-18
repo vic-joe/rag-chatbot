@@ -16,9 +16,9 @@ export function useWebSocket(userId, onMessage) {
         };
     }, [userId, onMessage]);
 
-    const sendMessage = (msg, sessionId) => {
+    const sendMessage = (msg, sessionId, history = []) => {
         if (ws.current?.readyState === WebSocket.OPEN) {
-            ws.current.send(JSON.stringify({ message: msg, session_id: sessionId }));
+            ws.current.send(JSON.stringify({ message: msg, session_id: sessionId, history }));
         }
     };
 

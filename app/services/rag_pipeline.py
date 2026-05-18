@@ -1,5 +1,5 @@
 import re
-from typing import Dict, Any, List, AsyncGenerator
+from typing import Dict, Any, List, AsyncGenerator, Optional
 
 from app.services.retrieval_service import RetrievalService
 from app.services.generation_service import GenerationService
@@ -9,9 +9,10 @@ class RAGPipeline:
     def __init__(self, retrieval_service: RetrievalService):
         self.retrieval_service = retrieval_service
         self.generator = GenerationService()
+        self.document_refusal = GenerationService.DOCUMENT_REFUSAL
         self.greeting_response = (
             "Hello! How can I help you today? "
-            "You can ask me questions about the uploaded documents."
+            "You can ask me anything, and I'll do my best to help."
         )
 
     def _is_greeting(self, query: str) -> bool:
@@ -27,15 +28,20 @@ class RAGPipeline:
 
         return any(re.match(pattern, normalized) for pattern in greeting_patterns)
 
-    # ---------------------------------------
-    # 1. Standard RAG Execution (IMPROVED)
-    # ---------------------------------------
-    def run(self, query: str) -> Dict[str, Any]:
+    def _is_empty_context(self, context: str) -> bool:
+        return not context or context.strip() == "No relevant context found."
+
+    def _should_fallback(self, answer: str) -> bool:
+        return answer.strip() == self.document_refusal
+
+    def run(
+        self,
+        query: str,
+        chat_history: Optional[List[Dict[str, str]]] = None,
+    ) -> Dict[str, Any]:
         """
-        Full RAG flow:
-        1. Retrieve documents
-        2. Format context
-        3. Generate grounded answer
+        Run document-grounded RAG first, then fall back to general AI if the
+        uploaded documents cannot answer.
         """
 
         if self._is_greeting(query):
@@ -47,34 +53,45 @@ class RAGPipeline:
             }
 
         retrieval_result = self.retrieval_service.get_context(query)
-
         context = retrieval_result["context"]
         documents = retrieval_result["documents"]
 
-        # ✅ Guard: empty context handling
-        if not context or context.strip() == "No relevant context found.":
+        if self._is_empty_context(context):
             return {
                 "query": query,
-                "answer": "I don't have enough information from the provided documents.",
+                "answer": self.generator.generate_fallback(query, chat_history),
                 "sources": [],
                 "context_used": False
             }
 
-        generation_result = self.generator.generate_response(query, context)
+        generation_result = self.generator.generate_response(query, context, chat_history)
+        answer = generation_result["answer"]
+
+        if self._should_fallback(answer):
+            return {
+                "query": query,
+                "answer": self.generator.generate_fallback(query, chat_history),
+                "sources": [],
+                "context_used": False
+            }
 
         return {
             "query": query,
-            "answer": generation_result["answer"],
+            "answer": answer,
             "sources": self._format_sources(documents),
             "context_used": generation_result["context_used"]
         }
 
-    # ---------------------------------------
-    # 2. Streaming RAG (NEW - IMPORTANT)
-    # ---------------------------------------
-    async def stream(self, query: str) -> AsyncGenerator[str, None]:
+    async def stream(
+        self,
+        query: str,
+        chat_history: Optional[List[Dict[str, str]]] = None,
+    ) -> AsyncGenerator[str, None]:
         """
-        Streaming RAG pipeline for WebSocket or real-time UI.
+        Streaming pipeline for WebSocket or real-time UI.
+
+        The document answer is buffered so users do not see the document-only
+        refusal before the fallback answer.
         """
 
         if self._is_greeting(query):
@@ -82,21 +99,29 @@ class RAGPipeline:
             return
 
         retrieval_result = self.retrieval_service.get_context(query)
-
         context = retrieval_result["context"]
 
-        # ✅ Guard for empty context
-        if not context or context.strip() == "No relevant context found.":
-            yield "I don't have enough information from the provided documents."
+        if self._is_empty_context(context):
+            async for token in self.generator.stream_fallback(query, chat_history):
+                yield token
             return
 
-        async for token in self.generator.stream_generate(query, context):
-            yield token
+        document_answer = ""
+        async for token in self.generator.stream_generate(query, context, chat_history):
+            document_answer += token
 
-    # ---------------------------------------
-    # 3. Debug Mode (VERY IMPORTANT)
-    # ---------------------------------------
-    def run_debug(self, query: str) -> Dict[str, Any]:
+        if self._should_fallback(document_answer):
+            async for token in self.generator.stream_fallback(query, chat_history):
+                yield token
+            return
+
+        yield document_answer
+
+    def run_debug(
+        self,
+        query: str,
+        chat_history: Optional[List[Dict[str, str]]] = None,
+    ) -> Dict[str, Any]:
         """
         Returns detailed internal pipeline data for debugging.
         """
@@ -108,7 +133,8 @@ class RAGPipeline:
                 "debug": {
                     "num_docs": 0,
                     "documents": [],
-                    "context_preview": "Greeting handled without document retrieval."
+                    "context_preview": "Greeting handled without document retrieval.",
+                    "fallback_used": False
                 }
             }
 
@@ -120,14 +146,21 @@ class RAGPipeline:
         for doc, score in scored_docs:
             documents.append(doc)
             debug_info.append({
-                "content": doc.page_content[:200],  # truncate
+                "content": doc.page_content[:200],
                 "metadata": doc.metadata,
                 "score": score
             })
 
         context = self.retrieval_service.format_context(documents)
 
-        answer = self.generator.generate(query, context)
+        if self._is_empty_context(context):
+            answer = self.generator.generate_fallback(query, chat_history)
+            fallback_used = True
+        else:
+            answer = self.generator.generate(query, context, chat_history)
+            fallback_used = self._should_fallback(answer)
+            if fallback_used:
+                answer = self.generator.generate_fallback(query, chat_history)
 
         return {
             "query": query,
@@ -135,13 +168,11 @@ class RAGPipeline:
             "debug": {
                 "num_docs": len(documents),
                 "documents": debug_info,
-                "context_preview": context[:500]
+                "context_preview": context[:500],
+                "fallback_used": fallback_used
             }
         }
 
-    # ---------------------------------------
-    # 4. Source Formatter (CLEANER OUTPUT)
-    # ---------------------------------------
     def _format_sources(self, documents: List) -> List[Dict[str, Any]]:
         """
         Formats sources for API response.

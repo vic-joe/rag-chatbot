@@ -73,6 +73,13 @@ function formatAuthError(data) {
         return data.detail;
     }
 
+    if (Array.isArray(data?.detail)) {
+        return data.detail
+            .map((item) => item?.msg)
+            .filter(Boolean)
+            .join(" ") || "Invalid admin credentials.";
+    }
+
     return "Invalid admin credentials.";
 }
 
