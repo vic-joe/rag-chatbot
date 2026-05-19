@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import NavigationLink from "../components/NavigationLink.jsx";
 import { clearAdminSession, getAdminSession } from "../utils/adminAuth.js";
+import udomLogo from "../assets/udom-logo.svg";
 
 const DashboardIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -65,7 +66,7 @@ export default function AdminLayout({ children }) {
 
     const handleLogout = () => {
         clearAdminSession();
-        window.history.replaceState({}, "", "/admin/login");
+        window.history.replaceState({}, "", "/login");
         window.dispatchEvent(new PopStateEvent("popstate"));
     };
 
@@ -88,10 +89,12 @@ export default function AdminLayout({ children }) {
                 {isSidebarOpen && (
                     <div className="admin-sidebar-content">
                         <div className="admin-brand">
-                            <span className="brand-mark">A</span>
+                            <span className="brand-mark">
+                                <img src={udomLogo} alt="The University of Dodoma" />
+                            </span>
                             <div>
                                 <p className="admin-brand-eyebrow">Admin</p>
-                                <h1>Control room</h1>
+                                <h1>UDOM Control</h1>
                             </div>
                         </div>
 

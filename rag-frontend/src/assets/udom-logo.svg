@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">The University of Dodoma logo</title>
+  <desc id="desc">Circular UDOM logo with shield, open book, and motto.</desc>
+  <defs>
+    <path id="top-arc" d="M 70 255 A 186 186 0 0 1 442 255" />
+    <path id="bottom-arc" d="M 424 304 A 184 184 0 0 1 88 304" />
+    <clipPath id="circle-clip">
+      <circle cx="256" cy="256" r="238" />
+    </clipPath>
+  </defs>
+  <rect width="512" height="512" fill="#050505" />
+  <g clip-path="url(#circle-clip)">
+    <circle cx="256" cy="256" r="238" fill="#f8f8f8" />
+    <circle cx="256" cy="256" r="236" fill="none" stroke="#0b4f9c" stroke-width="4" />
+    <circle cx="256" cy="256" r="218" fill="none" stroke="#111111" stroke-width="3" />
+    <text fill="#1559a9" font-family="Georgia, 'Times New Roman', serif" font-size="31" font-weight="700" letter-spacing="8">
+      <textPath href="#top-arc" startOffset="50%" text-anchor="middle">THE UNIVERSITY OF DODOMA</textPath>
+    </text>
+    <text fill="#c89122" font-family="Georgia, 'Times New Roman', serif" font-size="30" font-weight="700" letter-spacing="5">
+      <textPath href="#bottom-arc" startOffset="50%" text-anchor="middle">Embracing Knowledge</textPath>
+    </text>
+    <path d="M 139 145 H 373 V 284 C 373 337 332 381 256 411 C 180 381 139 337 139 284 Z" fill="none" stroke="#f06a00" stroke-width="8" />
+    <path d="M 165 170 H 347 V 280 C 347 316 316 350 256 376 C 196 350 165 316 165 280 Z" fill="none" stroke="#ba4a22" stroke-width="3" />
+    <path d="M 203 205 H 247 C 252 205 256 210 256 216 C 256 210 260 205 265 205 H 309 V 312 H 265 C 260 312 256 317 256 323 C 256 317 252 312 247 312 H 203 Z" fill="#f5f5f5" stroke="#333333" stroke-width="3" />
+    <line x1="256" y1="216" x2="256" y2="323" stroke="#999999" stroke-width="1.5" />
+    <circle cx="256" cy="260" r="58" fill="#ffffff" stroke="#d7d7d7" stroke-width="2" />
+    <g stroke="#888888" stroke-width="1">
+      <line x1="204" y1="232" x2="308" y2="232" />
+      <line x1="198" y1="244" x2="314" y2="244" />
+      <line x1="196" y1="256" x2="316" y2="256" />
+      <line x1="198" y1="268" x2="314" y2="268" />
+      <line x1="204" y1="280" x2="308" y2="280" />
+    </g>
+    <text x="256" y="274" text-anchor="middle" fill="#111111" font-family="Arial, Helvetica, sans-serif" font-size="45" font-weight="700" letter-spacing="5">UDOM</text>
+  </g>
+</svg>

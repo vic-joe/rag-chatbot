@@ -46,7 +46,7 @@ const statCards = (stats) => [
         value: stats.error ? "Alert" : "Healthy",
         helper: stats.error || "Vector store is responding",
         icon: <ActivityIcon />,
-        accent: stats.error ? "#fc814a" : "#63b3a4",
+        accent: stats.error ? "#a13f24" : "#9a4f35",
     },
     {
         key: "chunks",
@@ -54,7 +54,7 @@ const statCards = (stats) => [
         value: stats.isLoading ? "···" : stats.chunks,
         helper: "Total searchable chunks",
         icon: <CpuIcon />,
-        accent: "#63b3a4",
+        accent: "#9a4f35",
     },
     {
         key: "documents",
@@ -62,7 +62,7 @@ const statCards = (stats) => [
         value: stats.isLoading ? "···" : stats.documents,
         helper: "Document groups in the index",
         icon: <GridIcon />,
-        accent: "#63b3a4",
+        accent: "#9a4f35",
     },
 ];
 
@@ -96,7 +96,7 @@ export default function VectorStatus({ stats, documents }) {
                         <div style={{ ...styles.iconBadge, background: `${card.accent}18`, color: card.accent }}>
                             {card.icon}
                         </div>
-                        <strong style={{ ...styles.statValue, color: card.accent === "#63b3a4" ? "#f0f4f8" : card.accent }}>
+                        <strong style={{ ...styles.statValue, color: card.accent === "#9a4f35" ? "#2b2925" : card.accent }}>
                             {card.value ?? "—"}
                         </strong>
                         <p style={styles.statLabel}>{card.label}</p>
@@ -179,13 +179,14 @@ const styles = {
         gap: "12px",
     },
     statCard: {
-        background: "linear-gradient(135deg, #1e293b 0%, #162032 100%)",
-        border: "1px solid rgba(99,179,164,0.1)",
+        background: "#fffdf8",
+        border: "1px solid #ded9cd",
         borderRadius: "16px",
         padding: "24px",
         display: "flex",
         flexDirection: "column",
         gap: "6px",
+        boxShadow: "0 18px 44px rgba(72, 61, 47, 0.1)",
     },
     statCardNarrow: {
         padding: "18px",
@@ -208,21 +209,22 @@ const styles = {
     statLabel: {
         fontSize: "14px",
         fontWeight: "600",
-        color: "#cbd5e0",
+        color: "#4d4942",
         margin: 0,
     },
     statHelper: {
         fontSize: "12px",
-        color: "#718096",
+        color: "#8a8478",
     },
     panel: {
-        background: "#1a2332",
-        border: "1px solid rgba(255,255,255,0.07)",
+        background: "#fffdf8",
+        border: "1px solid #ded9cd",
         borderRadius: "20px",
         padding: "28px",
         display: "flex",
         flexDirection: "column",
         gap: "20px",
+        boxShadow: "0 18px 44px rgba(72, 61, 47, 0.1)",
     },
     panelNarrow: {
         padding: "16px",
@@ -244,13 +246,13 @@ const styles = {
         fontWeight: "700",
         letterSpacing: "1.5px",
         textTransform: "uppercase",
-        color: "#63b3a4",
+        color: "#9a4f35",
         marginBottom: "4px",
     },
     panelTitle: {
         fontSize: "18px",
         fontWeight: "700",
-        color: "#e2e8f0",
+        color: "#2b2925",
         margin: 0,
     },
     countBadge: {
@@ -258,15 +260,15 @@ const styles = {
         borderRadius: "20px",
         fontSize: "12px",
         fontWeight: "600",
-        background: "rgba(99,179,164,0.1)",
-        border: "1px solid rgba(99,179,164,0.2)",
-        color: "#63b3a4",
+        background: "#f7eadf",
+        border: "1px solid #e8cdb8",
+        color: "#9a4f35",
         whiteSpace: "nowrap",
     },
     tableWrapper: {
         borderRadius: "12px",
         overflow: "hidden",
-        border: "1px solid rgba(255,255,255,0.06)",
+        border: "1px solid #e3ded2",
     },
     table: {
         display: "flex",
@@ -276,12 +278,12 @@ const styles = {
         display: "flex",
         justifyContent: "space-between",
         padding: "10px 16px",
-        background: "rgba(255,255,255,0.04)",
+        background: "#f7f2e8",
         fontSize: "11px",
         fontWeight: "700",
         letterSpacing: "1px",
         textTransform: "uppercase",
-        color: "#4a5568",
+        color: "#8a8478",
     },
     tableHeaderNarrow: {
         display: "none",
@@ -291,7 +293,7 @@ const styles = {
         justifyContent: "space-between",
         alignItems: "center",
         padding: "12px 16px",
-        borderTop: "1px solid rgba(255,255,255,0.04)",
+        borderTop: "1px solid #e3ded2",
         transition: "background 0.15s",
     },
     tableRowNarrow: {
@@ -301,22 +303,22 @@ const styles = {
         padding: "14px",
     },
     tableRowEven: {
-        background: "rgba(255,255,255,0.015)",
+        background: "#fffaf0",
     },
     tableRowSource: {
         display: "flex",
         alignItems: "center",
         gap: "8px",
         fontSize: "13px",
-        color: "#cbd5e0",
+        color: "#4d4942",
         minWidth: 0,
         overflowWrap: "anywhere",
     },
     tableRowChunks: {
         fontSize: "12px",
         fontWeight: "600",
-        color: "#63b3a4",
-        background: "rgba(99,179,164,0.08)",
+        color: "#9a4f35",
+        background: "#f7eadf",
         padding: "3px 10px",
         borderRadius: "20px",
     },
@@ -332,15 +334,15 @@ const styles = {
         width: "44px",
         height: "44px",
         borderRadius: "12px",
-        background: "rgba(255,255,255,0.04)",
+        background: "#f0eee7",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        color: "#4a5568",
+        color: "#8a8478",
     },
     emptyText: {
         fontSize: "13px",
-        color: "#718096",
+        color: "#8a8478",
         margin: 0,
     },
     healthBanner: {
@@ -351,13 +353,13 @@ const styles = {
         borderRadius: "10px",
     },
     healthBannerOk: {
-        background: "rgba(99,179,164,0.07)",
-        border: "1px solid rgba(99,179,164,0.18)",
-        color: "#63b3a4",
+        background: "#f7eadf",
+        border: "1px solid #e8cdb8",
+        color: "#9a4f35",
     },
     healthBannerError: {
-        background: "rgba(252,129,74,0.07)",
-        border: "1px solid rgba(252,129,74,0.18)",
-        color: "#fc814a",
+        background: "#fff0e8",
+        border: "1px solid #f1c4b2",
+        color: "#a13f24",
     },
 };

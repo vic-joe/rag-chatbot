@@ -1,12 +1,15 @@
 import { useState } from "react";
 import udomLogo from "../../assets/udom-logo.svg";
 
-const UserIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-        <circle cx="12" cy="7" r="4" />
+const UserPlusIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+        <circle cx="9" cy="7" r="4" />
+        <line x1="19" y1="8" x2="19" y2="14" />
+        <line x1="16" y1="11" x2="22" y2="11" />
     </svg>
 );
+
 const KeyIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <circle cx="7.5" cy="15.5" r="5.5" />
@@ -14,6 +17,7 @@ const KeyIcon = () => (
         <path d="m15.5 7.5 3 3L22 7l-3-3" />
     </svg>
 );
+
 const AlertIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <circle cx="12" cy="12" r="10" />
@@ -21,14 +25,8 @@ const AlertIcon = () => (
         <line x1="12" y1="16" x2="12.01" y2="16" />
     </svg>
 );
-const ArrowRight = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-        <line x1="5" y1="12" x2="19" y2="12" />
-        <polyline points="12 5 19 12 12 19" />
-    </svg>
-);
 
-export default function LoginForm({ onLogin }) {
+export default function RegisterForm({ onRegister, onLoginClick }) {
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
     const [error, setError] = useState("");
@@ -46,9 +44,9 @@ export default function LoginForm({ onLogin }) {
 
         setIsLoading(true);
         try {
-            await onLogin(username, password);
-        } catch (loginError) {
-            setError(loginError.message || "Invalid credentials. Please try again.");
+            await onRegister(username, password);
+        } catch (registerError) {
+            setError(registerError.message || "Could not create account. Please try again.");
         } finally {
             setIsLoading(false);
         }
@@ -57,28 +55,25 @@ export default function LoginForm({ onLogin }) {
     return (
         <div style={styles.wrapper}>
             <div style={styles.card}>
-                {/* Header */}
                 <div style={styles.header}>
                     <div style={styles.iconBadge}>
                         <img src={udomLogo} alt="The University of Dodoma" style={styles.logo} />
                     </div>
                     <span style={styles.eyebrow}>UDOM Chatbot</span>
-                    <h2 style={styles.title}>Sign in</h2>
+                    <h2 style={styles.title}>Create account</h2>
                 </div>
 
-                {/* Form */}
                 <form style={styles.form} onSubmit={handleSubmit}>
                     <div style={styles.fields}>
-                        {/* Username */}
                         <div style={styles.fieldGroup}>
-                            <label style={styles.label} htmlFor="username">Username</label>
+                            <label style={styles.label} htmlFor="register-username">Username</label>
                             <div style={{
                                 ...styles.inputWrapper,
                                 ...(focused === "username" ? styles.inputWrapperFocused : {}),
                             }}>
-                                <span style={styles.inputIcon}><UserIcon /></span>
+                                <span style={styles.inputIcon}><UserPlusIcon /></span>
                                 <input
-                                    id="username"
+                                    id="register-username"
                                     style={styles.input}
                                     value={username}
                                     onChange={(e) => { setUsername(e.target.value); setError(""); }}
@@ -91,24 +86,23 @@ export default function LoginForm({ onLogin }) {
                             </div>
                         </div>
 
-                        {/* Password */}
                         <div style={styles.fieldGroup}>
-                            <label style={styles.label} htmlFor="password">Password</label>
+                            <label style={styles.label} htmlFor="register-password">Password</label>
                             <div style={{
                                 ...styles.inputWrapper,
                                 ...(focused === "password" ? styles.inputWrapperFocused : {}),
                             }}>
                                 <span style={styles.inputIcon}><KeyIcon /></span>
                                 <input
-                                    id="password"
+                                    id="register-password"
                                     style={styles.input}
                                     type="password"
                                     value={password}
                                     onChange={(e) => { setPassword(e.target.value); setError(""); }}
                                     onFocus={() => setFocused("password")}
                                     onBlur={() => setFocused(null)}
-                                    autoComplete="current-password"
-                                    placeholder="Enter password"
+                                    autoComplete="new-password"
+                                    placeholder="Create password"
                                     required
                                 />
                             </div>
@@ -127,17 +121,14 @@ export default function LoginForm({ onLogin }) {
                         style={{ ...styles.button, ...(isLoading ? styles.buttonDisabled : {}) }}
                         disabled={isLoading}
                     >
-                        {isLoading ? (
-                            <span style={styles.buttonInner}>
-                                <span style={styles.spinner} />
-                                Signing in...
-                            </span>
-                        ) : (
-                            <span style={styles.buttonInner}>
-                                Sign in
-                                <ArrowRight />
-                            </span>
-                        )}
+                        <span style={styles.buttonInner}>
+                            {isLoading ? <span style={styles.spinner} /> : <UserPlusIcon />}
+                            {isLoading ? "Creating account..." : "Create account"}
+                        </span>
+                    </button>
+
+                    <button type="button" style={styles.linkButton} onClick={onLoginClick}>
+                        Already have an account?
                     </button>
                 </form>
             </div>
@@ -204,7 +195,7 @@ const styles = {
     form: {
         display: "flex",
         flexDirection: "column",
-        gap: "20px",
+        gap: "18px",
     },
     fields: {
         display: "flex",
@@ -285,6 +276,15 @@ const styles = {
         alignItems: "center",
         justifyContent: "center",
         gap: "8px",
+    },
+    linkButton: {
+        border: "none",
+        background: "transparent",
+        color: "#9a4f35",
+        fontSize: "13px",
+        fontWeight: "700",
+        cursor: "pointer",
+        padding: 0,
     },
     spinner: {
         width: "16px",

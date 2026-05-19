@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     DOCUMENT_CHUNK_SIZE: int = 1800
     DOCUMENT_CHUNK_OVERLAP: int = 120
     CHAT_MODEL: str = "gpt-4o-mini"
+    ADMIN_USERNAMES: str = "admin"
 
     GROQ_API_KEY: str = ""
     GROQ_MODEL: str = "llama-3.3-70b-versatile"

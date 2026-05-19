@@ -5,7 +5,9 @@ import AdminLayout from "./layouts/AdminLayout.jsx";
 import ChatPage from "./pages/ChatPage.jsx";
 import AboutPage from "./pages/AboutPage.jsx";
 import AdminLoginPage from "./pages/AdminLoginPage.jsx";
+import RegisterPage from "./pages/RegisterPage.jsx";
 import AdminDashboardPage from "./pages/AdminDashboardPage.jsx";
+import ThemeToggle from "./components/ThemeToggle.jsx";
 import { isAdminAuthenticated } from "./utils/adminAuth.js";
 
 function normalizePath(pathname) {
@@ -27,7 +29,7 @@ function Redirect({ to, replace = true }) {
 
 function ProtectedAdminRoute({ children }) {
     if (!isAdminAuthenticated()) {
-        return <Redirect to="/admin/login" />;
+        return <Redirect to="/login" />;
     }
 
     return children;
@@ -35,6 +37,11 @@ function ProtectedAdminRoute({ children }) {
 
 export default function App() {
     const [path, setPath] = useState(() => normalizePath(window.location.pathname));
+    const [theme, setTheme] = useState(() => {
+        const savedTheme = window.localStorage.getItem("udomTheme");
+        if (savedTheme === "dark" || savedTheme === "light") return savedTheme;
+        return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    });
 
     useEffect(() => {
         const handlePopState = () => setPath(normalizePath(window.location.pathname));
@@ -43,17 +50,45 @@ export default function App() {
         return () => window.removeEventListener("popstate", handlePopState);
     }, []);
 
+    useEffect(() => {
+        document.documentElement.dataset.theme = theme;
+        window.localStorage.setItem("udomTheme", theme);
+    }, [theme]);
+
+    const toggleTheme = () => setTheme((current) => (current === "dark" ? "light" : "dark"));
+
+    if (path === "/login") {
+        return (
+            <>
+                <AdminLoginPage />
+                <ThemeToggle theme={theme} onToggle={toggleTheme} className="theme-toggle-admin" />
+            </>
+        );
+    }
+
+    if (path === "/register") {
+        return (
+            <>
+                <RegisterPage />
+                <ThemeToggle theme={theme} onToggle={toggleTheme} />
+            </>
+        );
+    }
+
     if (path === "/admin/login") {
-        return <AdminLoginPage />;
+        return <Redirect to="/login" />;
     }
 
     if (path === "/admin/dashboard") {
         return (
-            <ProtectedAdminRoute>
-                <AdminLayout>
-                    <AdminDashboardPage />
-                </AdminLayout>
-            </ProtectedAdminRoute>
+            <>
+                <ProtectedAdminRoute>
+                    <AdminLayout>
+                        <AdminDashboardPage />
+                    </AdminLayout>
+                </ProtectedAdminRoute>
+                <ThemeToggle theme={theme} onToggle={toggleTheme} />
+            </>
         );
     }
 
@@ -64,8 +99,11 @@ export default function App() {
     };
 
     return (
-        <PublicLayout>
-            {publicRoutes[path] ?? <Redirect to="/" />}
-        </PublicLayout>
+        <>
+            <PublicLayout>
+                {publicRoutes[path] ?? <Redirect to="/" />}
+            </PublicLayout>
+            <ThemeToggle theme={theme} onToggle={toggleTheme} />
+        </>
     );
 }

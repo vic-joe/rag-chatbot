@@ -25,10 +25,11 @@ function useMediaQuery(query) {
     return matches;
 }
 
-export default function ChatInput({ onSend, disabled = false }) {
+export default function ChatInput({ onSend, disabled = false, placement = "bottom" }) {
     const isNarrow = useMediaQuery("(max-width: 760px)");
     const [text, setText] = useState("");
     const [isFocused, setIsFocused] = useState(false);
+    const isCentered = placement === "center";
 
     const handleSend = () => {
         const message = text.trim();
@@ -47,7 +48,13 @@ export default function ChatInput({ onSend, disabled = false }) {
     const canSend = text.trim().length > 0 && !disabled;
 
     return (
-        <div style={{ ...styles.wrapper, ...(isNarrow ? styles.wrapperNarrow : {}) }}>
+        <div
+            style={{
+                ...styles.wrapper,
+                ...(isCentered ? styles.wrapperCentered : {}),
+                ...(isNarrow ? styles.wrapperNarrow : {}),
+            }}
+        >
             <div style={{
                 ...styles.inputRow,
                 ...(isFocused ? styles.inputRowFocused : {}),
@@ -77,7 +84,15 @@ export default function ChatInput({ onSend, disabled = false }) {
                     <SendIcon />
                 </button>
             </div>
-            <p style={{ ...styles.hint, ...(isNarrow ? styles.hintNarrow : {}) }}>Press Enter to send · Shift + Enter for new line</p>
+            <p
+                style={{
+                    ...styles.hint,
+                    ...(isCentered ? styles.hintCentered : {}),
+                    ...(isNarrow ? styles.hintNarrow : {}),
+                }}
+            >
+                Press Enter to send / Shift + Enter for new line
+            </p>
         </div>
     );
 }
@@ -162,3 +177,96 @@ const styles = {
         display: "none",
     },
 };
+
+Object.assign(styles, {
+    wrapper: {
+        padding: "12px 24px 22px",
+        borderTop: "none",
+        background: "#faf9f5",
+        display: "flex",
+        flexDirection: "column",
+        gap: "7px",
+    },
+    wrapperNarrow: {
+        padding: "10px 12px 14px",
+    },
+    wrapperCentered: {
+        width: "min(820px, 100%)",
+        padding: "6px 0 0",
+        background: "transparent",
+    },
+    inputRow: {
+        width: "min(780px, 100%)",
+        margin: "0 auto",
+        display: "flex",
+        alignItems: "flex-end",
+        gap: "10px",
+        background: "#fffdf8",
+        border: "1px solid #d8d1c3",
+        borderRadius: "18px",
+        padding: "12px 12px 12px 16px",
+        boxShadow: "0 12px 34px rgba(72, 61, 47, 0.1)",
+        transition: "border-color 0.2s, box-shadow 0.2s",
+    },
+    inputRowNarrow: {
+        gap: "8px",
+        padding: "10px",
+        borderRadius: "16px",
+    },
+    inputRowFocused: {
+        borderColor: "#c56a47",
+        boxShadow: "0 0 0 3px rgba(197,106,71,0.13), 0 12px 34px rgba(72, 61, 47, 0.1)",
+    },
+    textarea: {
+        flex: 1,
+        background: "transparent",
+        border: "none",
+        outline: "none",
+        resize: "none",
+        fontSize: "15px",
+        lineHeight: "1.55",
+        color: "#2b2925",
+        maxHeight: "160px",
+        overflowY: "auto",
+        padding: "4px 0",
+        fontFamily: "inherit",
+    },
+    textareaNarrow: {
+        fontSize: "14px",
+        maxHeight: "112px",
+    },
+    sendBtn: {
+        width: "36px",
+        height: "36px",
+        borderRadius: "10px",
+        border: "none",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        cursor: "pointer",
+        flexShrink: 0,
+        transition: "all 0.15s",
+    },
+    sendBtnActive: {
+        background: "#2b2925",
+        color: "#fffaf0",
+    },
+    sendBtnDisabled: {
+        background: "#eee9de",
+        color: "#aaa194",
+        cursor: "not-allowed",
+    },
+    hint: {
+        width: "min(780px, 100%)",
+        margin: "0 auto",
+        fontSize: "11px",
+        color: "#8a8478",
+        textAlign: "center",
+    },
+    hintCentered: {
+        color: "#8a8478",
+    },
+    hintNarrow: {
+        display: "none",
+    },
+});

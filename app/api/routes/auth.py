@@ -9,6 +9,7 @@ from app.core.security import (
     verify_legacy_plaintext_password,
     verify_password,
 )
+from app.core.config import settings
 from app.db.models import User
 from app.db.session import get_db
 from app.schemas.auth import AuthRequest, RegisterRequest, UserResponse
@@ -18,6 +19,20 @@ router = APIRouter()
 
 def normalize_username(username: str) -> str:
     return username.strip().lower()
+
+
+def get_user_role(username: str) -> str:
+    admin_usernames = {
+        normalize_username(admin_username)
+        for admin_username in settings.ADMIN_USERNAMES.split(",")
+        if admin_username.strip()
+    }
+
+    return "admin" if normalize_username(username) in admin_usernames else "user"
+
+
+def serialize_user(user: User) -> UserResponse:
+    return UserResponse(id=user.id, username=user.username, role=get_user_role(user.username))
 
 
 @router.post("/register", response_model=UserResponse, status_code=201)
@@ -36,7 +51,7 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
         db.rollback()
         raise HTTPException(status_code=409, detail="Username already exists")
 
-    return user
+    return serialize_user(user)
 
 
 @router.post("/login", response_model=UserResponse)
@@ -58,4 +73,4 @@ def login(payload: AuthRequest, db: Session = Depends(get_db)):
         db.commit()
         db.refresh(user)
 
-    return user
+    return serialize_user(user)

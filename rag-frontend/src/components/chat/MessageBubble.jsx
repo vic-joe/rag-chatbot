@@ -1,11 +1,7 @@
-const BotIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="3" y="11" width="18" height="10" rx="2" />
-        <circle cx="12" cy="5" r="2" />
-        <path d="M12 7v4" />
-        <line x1="8" y1="16" x2="8" y2="16" strokeWidth="3" />
-        <line x1="16" y1="16" x2="16" y2="16" strokeWidth="3" />
-    </svg>
+import udomLogo from "../../assets/udom-logo.svg";
+
+const BotLogo = () => (
+    <img src={udomLogo} alt="The University of Dodoma" style={styles.logoImage} />
 );
 
 const UserIcon = () => (
@@ -22,7 +18,7 @@ export default function MessageBubble({ role, content }) {
         <article style={{ ...styles.row, ...(isUser ? styles.rowUser : styles.rowAssistant) }}>
             {!isUser && (
                 <div style={styles.avatar}>
-                    <BotIcon />
+                    <BotLogo />
                 </div>
             )}
 
@@ -46,7 +42,7 @@ export function TypingBubble() {
     return (
         <article style={styles.row}>
             <div style={styles.avatar}>
-                <BotIcon />
+                <BotLogo />
             </div>
             <div style={styles.content}>
                 <span style={styles.author}>Assistant</span>
@@ -84,6 +80,13 @@ const styles = {
         justifyContent: "center",
         color: "#63b3a4",
         flexShrink: 0,
+    },
+    logoImage: {
+        width: "100%",
+        height: "100%",
+        objectFit: "cover",
+        borderRadius: "50%",
+        display: "block",
     },
     avatarUser: {
         width: "32px",
@@ -152,3 +155,102 @@ const styles = {
         animation: "typingBounce 1.2s ease-in-out infinite",
     },
 };
+
+Object.assign(styles, {
+    row: {
+        width: "min(780px, 100%)",
+        display: "flex",
+        alignItems: "flex-start",
+        gap: "12px",
+        padding: "14px 0",
+        margin: "0 auto",
+    },
+    rowUser: {
+        flexDirection: "row-reverse",
+        justifyContent: "flex-start",
+    },
+    rowAssistant: {
+        flexDirection: "row",
+    },
+    avatar: {
+        width: "32px",
+        height: "32px",
+        borderRadius: "50%",
+        background: "#050505",
+        border: "1px solid #d8d1c3",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        flexShrink: 0,
+        marginTop: "2px",
+        overflow: "hidden",
+    },
+    avatarUser: {
+        width: "32px",
+        height: "32px",
+        borderRadius: "10px",
+        background: "#eee9de",
+        border: "1px solid #d8d1c3",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        color: "#6f6a61",
+        flexShrink: 0,
+        marginTop: "2px",
+    },
+    content: {
+        display: "flex",
+        flexDirection: "column",
+        gap: "6px",
+        maxWidth: "min(680px, 84%)",
+    },
+    contentUser: {
+        alignItems: "flex-end",
+    },
+    contentAssistant: {
+        alignItems: "flex-start",
+    },
+    author: {
+        fontSize: "12px",
+        fontWeight: "700",
+        color: "#6f6a61",
+        letterSpacing: 0,
+        textTransform: "none",
+        paddingLeft: "2px",
+    },
+    bubble: {
+        padding: "0",
+        borderRadius: "16px",
+        fontSize: "15px",
+        lineHeight: "1.7",
+        whiteSpace: "pre-wrap",
+        wordBreak: "break-word",
+    },
+    bubbleUser: {
+        padding: "10px 15px",
+        background: "#efeae0",
+        color: "#2b2925",
+        fontWeight: "500",
+        borderBottomRightRadius: "6px",
+    },
+    bubbleAssistant: {
+        background: "transparent",
+        border: "none",
+        color: "#2b2925",
+        borderBottomLeftRadius: "16px",
+    },
+    typingBubble: {
+        display: "flex",
+        alignItems: "center",
+        gap: "5px",
+        padding: "10px 0",
+    },
+    dot: {
+        width: "7px",
+        height: "7px",
+        borderRadius: "50%",
+        background: "#b66a4e",
+        display: "inline-block",
+        animation: "typingPulse 1.2s ease-in-out infinite",
+    },
+});

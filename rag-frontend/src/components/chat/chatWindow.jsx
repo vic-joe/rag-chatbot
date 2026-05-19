@@ -4,8 +4,8 @@ import ChatInput from "./ChatInput";
 import { useWebSocket } from "../../hooks/useWebSocket";
 import {
     createChatSession, deleteChatSession, getChatSession, getChatSessions,
-    loginUser, registerUser,
 } from "../../api/chatApi";
+import udomLogo from "../../assets/udom-logo.svg";
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 const PlusIcon = () => (
@@ -34,41 +34,43 @@ const UserIcon = () => (
         <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" />
     </svg>
 );
+const UserPlusIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+        <circle cx="9" cy="7" r="4" />
+        <line x1="19" y1="8" x2="19" y2="14" />
+        <line x1="16" y1="11" x2="22" y2="11" />
+    </svg>
+);
+const LoginIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+        <polyline points="10 17 15 12 10 7" />
+        <line x1="15" y1="12" x2="3" y2="12" />
+    </svg>
+);
 const LogOutIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
         <polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" />
     </svg>
 );
-const BotIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="3" y="11" width="18" height="10" rx="2" /><circle cx="12" cy="5" r="2" />
-        <path d="M12 7v4" />
-        <line x1="8" y1="16" x2="8" y2="16" strokeWidth="3" />
-        <line x1="16" y1="16" x2="16" y2="16" strokeWidth="3" />
-    </svg>
-);
-const BookIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-    </svg>
-);
-const SearchIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-    </svg>
-);
-const ClockIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
-    </svg>
+const ChatLogo = () => (
+    <img src={udomLogo} alt="The University of Dodoma" style={styles.logoImage} />
 );
 
-const examplePrompts = [
-    { icon: <BookIcon />, text: "Summarize this topic for me" },
-    { icon: <SearchIcon />, text: "What are the key points I should know?" },
-    { icon: <ClockIcon />, text: "Help me understand requirements or deadlines" },
-];
+function navigate(to) {
+    window.history.pushState({}, "", to);
+    window.dispatchEvent(new PopStateEvent("popstate"));
+}
+
+function getTimeGreeting(date = new Date()) {
+    const hour = date.getHours();
+
+    if (hour < 12) return "Good morning";
+    if (hour < 17) return "Good afternoon";
+    return "Good evening";
+}
 
 function useMediaQuery(query) {
     const [matches, setMatches] = useState(() => (
@@ -90,6 +92,7 @@ function useMediaQuery(query) {
 
 export default function ChatWindow() {
     const isNarrow = useMediaQuery("(max-width: 760px)");
+    const greeting = getTimeGreeting();
     const [user, setUser] = useState(() => {
         try {
             const saved = window.localStorage.getItem("ragUser");
@@ -99,17 +102,13 @@ export default function ChatWindow() {
             return null;
         }
     });
-    const [authMode, setAuthMode] = useState("login");
-    const [authForm, setAuthForm] = useState({ username: "", password: "" });
-    const [authError, setAuthError] = useState("");
-    const [isAuthOpen, setIsAuthOpen] = useState(false);
     const [sessions, setSessions] = useState([]);
     const [activeSessionId, setActiveSessionId] = useState(null);
     const [messages, setMessages] = useState([]);
     const [isWaiting, setIsWaiting] = useState(false);
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+    const [isAuthMenuOpen, setIsAuthMenuOpen] = useState(false);
     const [historyError, setHistoryError] = useState("");
-    const [authFocused, setAuthFocused] = useState(null);
     const messageListRef = useRef(null);
 
     const loadSessions = useCallback(async () => {
@@ -144,23 +143,6 @@ export default function ChatWindow() {
         const timer = window.setTimeout(() => loadSessions(), 0);
         return () => window.clearTimeout(timer);
     }, [loadSessions]);
-
-    const handleAuthSubmit = async (e) => {
-        e.preventDefault();
-        setAuthError("");
-        try {
-            const action = authMode === "login" ? loginUser : registerUser;
-            const nextUser = await action(authForm.username, authForm.password);
-            window.localStorage.setItem("ragUser", JSON.stringify(nextUser));
-            setUser(nextUser);
-            setAuthForm({ username: "", password: "" });
-            setIsAuthOpen(false);
-            setMessages([]);
-            setActiveSessionId(null);
-        } catch (error) {
-            setAuthError(error.message);
-        }
-    };
 
     const handleLogout = () => {
         window.localStorage.removeItem("ragUser");
@@ -233,9 +215,9 @@ export default function ChatWindow() {
     }, [messages, isWaiting]);
 
     return (
-        <div style={{ ...styles.chatWindow, ...(isNarrow ? styles.chatWindowNarrow : {}) }}>
+        <div className="chat-window-theme" style={{ ...styles.chatWindow, ...(isNarrow ? styles.chatWindowNarrow : {}) }}>
             {/* Sidebar */}
-            <aside style={{
+            <aside className="chat-sidebar-theme" style={{
                 ...styles.sidebar,
                 ...(isSidebarOpen ? styles.sidebarOpen : styles.sidebarClosed),
                 ...(isNarrow ? (isSidebarOpen ? styles.sidebarOpenNarrow : styles.sidebarClosedNarrow) : {}),
@@ -256,98 +238,22 @@ export default function ChatWindow() {
                             {/* Sidebar Header */}
                             <div style={styles.sidebarHeader}>
                                 <div style={styles.brandMark}>
-                                    <BotIcon />
+                                    <ChatLogo />
                                 </div>
                                 <div>
-                                    <p style={styles.brandEyebrow}>RAG Chatbot</p>
+                                    <p style={styles.brandEyebrow}>UDOM Chatbot</p>
                                     <h2 style={styles.brandTitle}>Chats</h2>
                                 </div>
                             </div>
 
                             {/* New Chat Button */}
-                            <button type="button" style={styles.newChatBtn} onClick={handleNewChat}>
+                            <button type="button" className="new-chat-theme" style={styles.newChatBtn} onClick={handleNewChat}>
                                 <PlusIcon />
                                 New chat
                             </button>
 
                             {/* Auth / Sessions */}
-                            {!user ? (
-                                <div style={styles.guestSection}>
-                                    <div style={styles.guestBadge}>
-                                        <UserIcon />
-                                        <span>Guest mode</span>
-                                    </div>
-
-                                    {!isAuthOpen ? (
-                                        <button
-                                            type="button"
-                                            style={styles.openAuthBtn}
-                                            onClick={() => setIsAuthOpen(true)}
-                                        >
-                                            Log in / Create account
-                                        </button>
-                                    ) : (
-                                        <form style={styles.authCard} onSubmit={handleAuthSubmit}>
-                                            <div style={styles.authCardHeader}>
-                                                <h3 style={styles.authCardTitle}>
-                                                    {authMode === "login" ? "Log in" : "Create account"}
-                                                </h3>
-                                                <button
-                                                    type="button"
-                                                    style={styles.closeAuthBtn}
-                                                    onClick={() => { setIsAuthOpen(false); setAuthError(""); }}
-                                                    aria-label="Close login form"
-                                                >
-                                                    <XIcon />
-                                                </button>
-                                            </div>
-
-                                            <div style={styles.authField}>
-                                                <label style={styles.authLabel}>Username</label>
-                                                <input
-                                                    style={{
-                                                        ...styles.authInput,
-                                                        ...(authFocused === "u" ? styles.authInputFocused : {}),
-                                                    }}
-                                                    value={authForm.username}
-                                                    onChange={(e) => setAuthForm((c) => ({ ...c, username: e.target.value }))}
-                                                    onFocus={() => setAuthFocused("u")}
-                                                    onBlur={() => setAuthFocused(null)}
-                                                    autoComplete="username"
-                                                />
-                                            </div>
-                                            <div style={styles.authField}>
-                                                <label style={styles.authLabel}>Password</label>
-                                                <input
-                                                    type="password"
-                                                    style={{
-                                                        ...styles.authInput,
-                                                        ...(authFocused === "p" ? styles.authInputFocused : {}),
-                                                    }}
-                                                    value={authForm.password}
-                                                    onChange={(e) => setAuthForm((c) => ({ ...c, password: e.target.value }))}
-                                                    onFocus={() => setAuthFocused("p")}
-                                                    onBlur={() => setAuthFocused(null)}
-                                                    autoComplete={authMode === "login" ? "current-password" : "new-password"}
-                                                />
-                                            </div>
-
-                                            {authError && <p style={styles.authError}>{authError}</p>}
-
-                                            <button type="submit" style={styles.authSubmitBtn}>
-                                                {authMode === "login" ? "Log in" : "Create account"}
-                                            </button>
-                                            <button
-                                                type="button"
-                                                style={styles.authToggleBtn}
-                                                onClick={() => { setAuthMode((m) => (m === "login" ? "register" : "login")); setAuthError(""); }}
-                                            >
-                                                {authMode === "login" ? "Need an account?" : "Already have an account?"}
-                                            </button>
-                                        </form>
-                                    )}
-                                </div>
-                            ) : (
+                            {user && (
                                 <div style={styles.sessionSection}>
                                     {historyError && <p style={styles.historyError}>{historyError}</p>}
 
@@ -404,51 +310,73 @@ export default function ChatWindow() {
             </aside>
 
             {/* Main Chat Panel */}
-            <div style={{ ...styles.panel, ...(isNarrow ? styles.panelNarrow : {}) }}>
+            <div className="chat-panel-theme" style={{ ...styles.panel, ...(isNarrow ? styles.panelNarrow : {}) }}>
                 {/* Panel Header */}
-                <div style={{ ...styles.panelHeader, ...(isNarrow ? styles.panelHeaderNarrow : {}) }}>
+                <div className="chat-panel-header-theme" style={{ ...styles.panelHeader, ...(isNarrow ? styles.panelHeaderNarrow : {}) }}>
                     <div style={styles.panelHeaderLeft}>
-                        <div style={styles.panelHeaderIcon}><BotIcon /></div>
+                        <div style={styles.panelHeaderIcon}><ChatLogo /></div>
                         <div>
                             <h2 style={styles.panelTitle}>University Assistant</h2>
                             <p style={styles.panelSubtitle}>
-                                {user ? `Signed in as ${user.username}` : "Guest mode"}
+                                {user ? `${greeting}, ${user.username}` : "Ready to help"}
                             </p>
                         </div>
                     </div>
-                    <span style={{
-                        ...styles.connectionPill,
-                        ...(user ? styles.pillActive : styles.pillGuest),
-                        ...(isNarrow ? styles.connectionPillNarrow : {}),
-                    }}>
-                        {user ? "History on" : "Temporary chat"}
-                    </span>
+                    {!user && (
+                        <div style={{ ...styles.authHeaderActions, ...(isNarrow ? styles.authHeaderActionsNarrow : {}) }}>
+                            <button
+                                type="button"
+                                style={styles.accountMenuButton}
+                                onClick={() => setIsAuthMenuOpen((value) => !value)}
+                                aria-label="Open account menu"
+                                aria-expanded={isAuthMenuOpen}
+                            >
+                                <UserIcon />
+                            </button>
+                            {isAuthMenuOpen && (
+                                <div style={styles.accountMenu}>
+                                    <button
+                                        type="button"
+                                        style={{ ...styles.accountMenuItem, ...styles.accountMenuSecondary }}
+                                        onClick={() => {
+                                            setIsAuthMenuOpen(false);
+                                            navigate("/login");
+                                        }}
+                                    >
+                                        <LoginIcon />
+                                        Log in
+                                    </button>
+                                    <button
+                                        type="button"
+                                        style={{ ...styles.accountMenuItem, ...styles.accountMenuPrimary }}
+                                        onClick={() => {
+                                            setIsAuthMenuOpen(false);
+                                            navigate("/register");
+                                        }}
+                                    >
+                                        <UserPlusIcon />
+                                        Create account
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
 
                 {/* Messages */}
-                <div style={{ ...styles.messageList, ...(isNarrow ? styles.messageListNarrow : {}) }} ref={messageListRef}>
+                <div className="chat-message-list-theme" style={{ ...styles.messageList, ...(isNarrow ? styles.messageListNarrow : {}) }} ref={messageListRef}>
                     {messages.length === 0 ? (
                         <section style={{ ...styles.emptyChat, ...(isNarrow ? styles.emptyChatNarrow : {}) }}>
-                            <div style={styles.emptyChatIcon}><BotIcon /></div>
-                            <h3 style={styles.emptyChatTitle}>How can I assist you?</h3>
+                            <div style={styles.emptyChatIcon}><ChatLogo /></div>
+                            <h3 style={styles.emptyChatTitle}>
+                                {user ? `${greeting}, ${user.username}` : "How can I assist you?"}
+                            </h3>
                             <p style={styles.emptyChatSubtitle}>
                                 {user
                                     ? "Ask questions and get clear, helpful answers. Your chat is saved."
                                     : "Ask questions and get clear, helpful answers. Log in only if you want saved history."}
                             </p>
-                            <div style={{ ...styles.promptGrid, ...(isNarrow ? styles.promptGridNarrow : {}) }}>
-                                {examplePrompts.map((p) => (
-                                    <button
-                                        key={p.text}
-                                        type="button"
-                                        style={styles.promptBtn}
-                                        onClick={() => handleSend(p.text)}
-                                    >
-                                        <span style={styles.promptIcon}>{p.icon}</span>
-                                        {p.text}
-                                    </button>
-                                ))}
-                            </div>
+                            <ChatInput onSend={handleSend} disabled={isWaiting} placement="center" />
                         </section>
                     ) : (
                         messages.map((m, i) => (
@@ -459,7 +387,7 @@ export default function ChatWindow() {
                     {isWaiting && <TypingBubble />}
                 </div>
 
-                <ChatInput onSend={handleSend} disabled={isWaiting} />
+                {messages.length > 0 && <ChatInput onSend={handleSend} disabled={isWaiting} />}
             </div>
         </div>
     );
@@ -539,14 +467,21 @@ const styles = {
     brandMark: {
         width: "36px",
         height: "36px",
-        borderRadius: "10px",
-        background: "linear-gradient(135deg, rgba(99,179,164,0.15), rgba(99,179,164,0.05))",
-        border: "1px solid rgba(99,179,164,0.2)",
+        borderRadius: "50%",
+        background: "#050505",
+        border: "1px solid rgba(255,255,255,0.16)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        color: "#63b3a4",
         flexShrink: 0,
+        overflow: "hidden",
+    },
+    logoImage: {
+        width: "100%",
+        height: "100%",
+        objectFit: "cover",
+        borderRadius: "50%",
+        display: "block",
     },
     brandEyebrow: {
         fontSize: "10px",
@@ -582,18 +517,6 @@ const styles = {
         flexDirection: "column",
         gap: "10px",
         flex: 1,
-    },
-    guestBadge: {
-        display: "flex",
-        alignItems: "center",
-        gap: "7px",
-        padding: "8px 12px",
-        borderRadius: "8px",
-        background: "rgba(255,255,255,0.03)",
-        border: "1px solid rgba(255,255,255,0.06)",
-        color: "#718096",
-        fontSize: "12px",
-        fontWeight: "600",
     },
     openAuthBtn: {
         padding: "9px 12px",
@@ -828,15 +751,15 @@ const styles = {
     },
     panelHeaderLeft: { display: "flex", alignItems: "center", gap: "12px" },
     panelHeaderIcon: {
-        width: "38px",
-        height: "38px",
-        borderRadius: "10px",
-        background: "linear-gradient(135deg, rgba(99,179,164,0.15), rgba(99,179,164,0.05))",
-        border: "1px solid rgba(99,179,164,0.2)",
+        width: "42px",
+        height: "42px",
+        borderRadius: "50%",
+        background: "#050505",
+        border: "1px solid rgba(255,255,255,0.16)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        color: "#63b3a4",
+        overflow: "hidden",
     },
     panelTitle: { fontSize: "16px", fontWeight: "700", color: "#e2e8f0", margin: 0 },
     panelSubtitle: { fontSize: "12px", color: "#4a5568", margin: 0 },
@@ -891,16 +814,16 @@ const styles = {
         margin: 0,
     },
     emptyChatIcon: {
-        width: "60px",
-        height: "60px",
-        borderRadius: "18px",
-        background: "linear-gradient(135deg, rgba(99,179,164,0.15), rgba(99,179,164,0.04))",
-        border: "1px solid rgba(99,179,164,0.2)",
+        width: "92px",
+        height: "92px",
+        borderRadius: "50%",
+        background: "#050505",
+        border: "1px solid rgba(255,255,255,0.16)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        color: "#63b3a4",
         marginBottom: "4px",
+        overflow: "hidden",
     },
     emptyChatTitle: { fontSize: "20px", fontWeight: "700", color: "#e2e8f0", margin: 0 },
     emptyChatSubtitle: { fontSize: "14px", color: "#718096", margin: 0, maxWidth: "400px", lineHeight: 1.5 },
@@ -935,3 +858,492 @@ const styles = {
         display: "flex",
     },
 };
+
+Object.assign(styles, {
+    chatWindow: {
+        display: "flex",
+        height: "100vh",
+        background: "#faf9f5",
+        overflow: "hidden",
+        fontFamily: "inherit",
+        color: "#2b2925",
+    },
+    chatWindowNarrow: {
+        flexDirection: "column",
+        height: "100dvh",
+        minHeight: 0,
+    },
+    sidebar: {
+        flexShrink: 0,
+        alignSelf: "stretch",
+        height: "100%",
+        transition: "width 0.25s ease",
+        overflow: "hidden",
+        background: "#f0eee7",
+        borderRight: "1px solid #ded9cd",
+    },
+    sidebarOpen: { width: "280px" },
+    sidebarClosed: { width: "64px" },
+    sidebarOpenNarrow: {
+        width: "100%",
+        height: "100%",
+        maxHeight: "none",
+    },
+    sidebarClosedNarrow: {
+        width: "100%",
+        height: "60px",
+    },
+    toggleBtn: {
+        width: "36px",
+        height: "36px",
+        margin: "12px 10px",
+        borderRadius: "10px",
+        border: "1px solid #ded9cd",
+        background: "transparent",
+        color: "#6f6a61",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        cursor: "pointer",
+        flexShrink: 0,
+        transition: "all 0.15s",
+    },
+    sidebarHeader: {
+        display: "flex",
+        alignItems: "center",
+        gap: "10px",
+        padding: "4px 0 8px",
+        borderBottom: "1px solid #e3ded2",
+        marginBottom: "4px",
+    },
+    brandMark: {
+        width: "36px",
+        height: "36px",
+        borderRadius: "50%",
+        background: "#050505",
+        border: "1px solid #d8d1c3",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        flexShrink: 0,
+        overflow: "hidden",
+    },
+    brandEyebrow: {
+        fontSize: "10px",
+        fontWeight: "700",
+        letterSpacing: "1.2px",
+        textTransform: "uppercase",
+        color: "#9a4f35",
+        margin: 0,
+    },
+    brandTitle: {
+        fontSize: "16px",
+        fontWeight: "700",
+        color: "#2b2925",
+        margin: 0,
+    },
+    newChatBtn: {
+        display: "flex",
+        alignItems: "center",
+        gap: "8px",
+        padding: "9px 12px",
+        borderRadius: "8px",
+        border: "1px solid #ded9cd",
+        background: "#fffaf0",
+        color: "#2f2b25",
+        fontSize: "13px",
+        fontWeight: "700",
+        cursor: "pointer",
+        width: "100%",
+        transition: "all 0.15s",
+    },
+    openAuthBtn: {
+        padding: "9px 12px",
+        borderRadius: "8px",
+        border: "1px solid #d7d0c1",
+        background: "transparent",
+        color: "#4d4942",
+        fontSize: "13px",
+        fontWeight: "600",
+        cursor: "pointer",
+        width: "100%",
+        textAlign: "left",
+    },
+    authCard: {
+        background: "#fffaf0",
+        borderRadius: "8px",
+        padding: "16px",
+        display: "flex",
+        flexDirection: "column",
+        gap: "12px",
+        border: "1px solid #ded9cd",
+    },
+    authCardTitle: {
+        fontSize: "14px",
+        fontWeight: "700",
+        color: "#2b2925",
+        margin: 0,
+    },
+    closeAuthBtn: {
+        width: "26px",
+        height: "26px",
+        borderRadius: "8px",
+        border: "1px solid #ded9cd",
+        background: "transparent",
+        color: "#6f6a61",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        cursor: "pointer",
+    },
+    authLabel: { fontSize: "11px", fontWeight: "600", color: "#6f6a61" },
+    authInput: {
+        padding: "8px 10px",
+        borderRadius: "8px",
+        border: "1px solid #d7d0c1",
+        background: "#ffffff",
+        color: "#2b2925",
+        fontSize: "13px",
+        outline: "none",
+        transition: "border-color 0.2s, box-shadow 0.2s",
+        width: "100%",
+        boxSizing: "border-box",
+    },
+    authInputFocused: {
+        borderColor: "#d96c47",
+        boxShadow: "0 0 0 3px rgba(217,108,71,0.12)",
+    },
+    authError: {
+        fontSize: "12px",
+        color: "#a13f24",
+        background: "#fff0e8",
+        border: "1px solid #f1c4b2",
+        borderRadius: "8px",
+        padding: "8px 10px",
+        margin: 0,
+    },
+    authSubmitBtn: {
+        padding: "9px",
+        borderRadius: "8px",
+        border: "none",
+        background: "#2b2925",
+        color: "#fffaf0",
+        fontSize: "13px",
+        fontWeight: "700",
+        cursor: "pointer",
+        width: "100%",
+    },
+    authToggleBtn: {
+        background: "transparent",
+        border: "none",
+        color: "#9a4f35",
+        fontSize: "12px",
+        cursor: "pointer",
+        padding: "0",
+        textAlign: "center",
+        width: "100%",
+    },
+    historyError: {
+        fontSize: "12px",
+        color: "#a13f24",
+        background: "#fff0e8",
+        borderRadius: "8px",
+        padding: "8px 10px",
+        margin: 0,
+    },
+    emptyHistory: {
+        fontSize: "12px",
+        color: "#8a8478",
+        textAlign: "center",
+        padding: "24px 0",
+        margin: 0,
+    },
+    historyItem: {
+        display: "flex",
+        alignItems: "center",
+        borderRadius: "8px",
+        overflow: "hidden",
+        border: "1px solid transparent",
+        transition: "all 0.15s",
+    },
+    historyItemActive: {
+        background: "#fffaf0",
+        border: "1px solid #d9c9b4",
+    },
+    historyItemTitle: {
+        fontSize: "12px",
+        fontWeight: "600",
+        color: "#4d4942",
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap",
+        display: "block",
+    },
+    historyItemDate: {
+        fontSize: "10px",
+        color: "#8a8478",
+    },
+    historyItemDelete: {
+        width: "32px",
+        height: "32px",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "transparent",
+        border: "none",
+        color: "#8a8478",
+        cursor: "pointer",
+        flexShrink: 0,
+        borderRadius: "8px",
+        margin: "2px",
+        transition: "all 0.15s",
+    },
+    userCard: {
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        padding: "10px 12px",
+        borderRadius: "8px",
+        background: "#e8e4da",
+        border: "1px solid #ded9cd",
+        marginTop: "auto",
+    },
+    userAvatar: {
+        width: "28px",
+        height: "28px",
+        borderRadius: "8px",
+        background: "#fffaf0",
+        border: "1px solid #d9c9b4",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        color: "#9a4f35",
+    },
+    userName: { fontSize: "12px", fontWeight: "600", color: "#4d4942" },
+    logoutBtn: {
+        width: "28px",
+        height: "28px",
+        borderRadius: "8px",
+        border: "1px solid #d7d0c1",
+        background: "transparent",
+        color: "#8a8478",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        cursor: "pointer",
+    },
+    panel: {
+        flex: 1,
+        display: "flex",
+        flexDirection: "column",
+        minWidth: 0,
+        overflow: "hidden",
+        background: "#faf9f5",
+    },
+    panelHeader: {
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        padding: "14px 24px",
+        borderBottom: "1px solid #e8e2d6",
+        background: "rgba(250,249,245,0.94)",
+        backdropFilter: "blur(14px)",
+        gap: "12px",
+    },
+    authHeaderActions: {
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "flex-end",
+        gap: "6px",
+        marginLeft: "auto",
+        marginRight: "58px",
+        padding: "5px",
+        border: "1px solid #ded9cd",
+        borderRadius: "16px",
+        background: "#fffdf8",
+        flexShrink: 0,
+        position: "relative",
+        boxShadow: "0 10px 26px rgba(72, 61, 47, 0.08)",
+    },
+    authHeaderActionsNarrow: {
+        width: "auto",
+        justifyContent: "flex-end",
+        marginLeft: "auto",
+        marginRight: "52px",
+        padding: "6px",
+    },
+    accountMenuButton: {
+        width: "38px",
+        height: "38px",
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        borderRadius: "12px",
+        border: "1px solid #d7d0c1",
+        background: "#fffaf0",
+        color: "#2b2925",
+        cursor: "pointer",
+        transition: "border-color 0.15s, background 0.15s, transform 0.15s",
+    },
+    accountMenu: {
+        position: "absolute",
+        top: "calc(100% + 10px)",
+        right: 0,
+        zIndex: 20,
+        width: "210px",
+        display: "flex",
+        flexDirection: "column",
+        gap: "6px",
+        padding: "8px",
+        borderRadius: "14px",
+        border: "1px solid #ded9cd",
+        background: "#fffdf8",
+        boxShadow: "0 18px 42px rgba(72, 61, 47, 0.16)",
+    },
+    accountMenuItem: {
+        minHeight: "38px",
+        display: "flex",
+        alignItems: "center",
+        gap: "9px",
+        width: "100%",
+        borderRadius: "10px",
+        padding: "9px 11px",
+        fontSize: "13px",
+        fontWeight: "800",
+        cursor: "pointer",
+        textAlign: "left",
+    },
+    accountMenuSecondary: {
+        border: "1px solid transparent",
+        background: "transparent",
+        color: "#4d4942",
+    },
+    accountMenuPrimary: {
+        border: "1px solid #2b2925",
+        background: "#2b2925",
+        color: "#fffaf0",
+    },
+    headerAuthButton: {
+        minHeight: "36px",
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: "8px",
+        padding: "9px 13px",
+        borderRadius: "10px",
+        fontSize: "13px",
+        fontWeight: "700",
+        cursor: "pointer",
+        whiteSpace: "nowrap",
+        transition: "border-color 0.15s, background 0.15s, color 0.15s, transform 0.15s",
+    },
+    headerLoginButton: {
+        border: "1px solid transparent",
+        background: "transparent",
+        color: "#6f6a61",
+    },
+    headerCreateButton: {
+        border: "1px solid #2b2925",
+        background: "#2b2925",
+        color: "#fffaf0",
+    },
+    panelHeaderIcon: {
+        width: "46px",
+        height: "46px",
+        borderRadius: "50%",
+        background: "#050505",
+        border: "1px solid #d8d1c3",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        overflow: "hidden",
+    },
+    panelTitle: { fontSize: "17px", fontWeight: "800", color: "#2b2925", margin: 0, lineHeight: 1.1 },
+    panelSubtitle: { fontSize: "12px", color: "#8a8478", margin: "3px 0 0" },
+    pillActive: {
+        background: "#f7eadf",
+        border: "1px solid #e8cdb8",
+        color: "#9a4f35",
+    },
+    pillGuest: {
+        background: "#f0eee7",
+        border: "1px solid #ded9cd",
+        color: "#6f6a61",
+    },
+    messageList: {
+        flex: 1,
+        overflowY: "auto",
+        padding: "24px max(24px, calc((100vw - 940px) / 2)) 12px",
+        display: "flex",
+        flexDirection: "column",
+        gap: "2px",
+        minHeight: 0,
+    },
+    messageListNarrow: {
+        padding: "16px 14px 8px",
+    },
+    emptyChat: {
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        flex: 1,
+        textAlign: "center",
+        gap: "14px",
+        padding: "48px 24px",
+        margin: "auto 0",
+    },
+    emptyChatIcon: {
+        width: "92px",
+        height: "92px",
+        borderRadius: "50%",
+        background: "#050505",
+        border: "1px solid #d8d1c3",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        marginBottom: "4px",
+        overflow: "hidden",
+    },
+    emptyChatTitle: {
+        fontSize: "clamp(30px, 5vw, 44px)",
+        fontWeight: "700",
+        color: "#2b2925",
+        margin: 0,
+        letterSpacing: "-0.02em",
+    },
+    emptyChatSubtitle: {
+        fontSize: "15px",
+        color: "#6f6a61",
+        margin: 0,
+        maxWidth: "460px",
+        lineHeight: 1.55,
+    },
+    promptGrid: {
+        display: "flex",
+        flexDirection: "column",
+        gap: "8px",
+        width: "100%",
+        maxWidth: "620px",
+        marginTop: "8px",
+    },
+    promptBtn: {
+        display: "flex",
+        alignItems: "center",
+        gap: "10px",
+        padding: "12px 16px",
+        borderRadius: "12px",
+        border: "1px solid #ded9cd",
+        background: "#fffaf0",
+        color: "#4d4942",
+        fontSize: "14px",
+        cursor: "pointer",
+        textAlign: "left",
+        transition: "all 0.15s",
+    },
+    promptIcon: {
+        color: "#9a4f35",
+        flexShrink: 0,
+        display: "flex",
+    },
+});

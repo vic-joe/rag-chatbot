@@ -3,7 +3,7 @@ export default function AboutPage() {
         <section className="about-page">
             <div>
                 <p className="eyebrow">About</p>
-                <h1>A RAG assistant for grounded document conversations.</h1>
+                <h1>UDOM Chatbot for grounded document conversations.</h1>
             </div>
             <p>
                 The public frontend gives users a clean chatbot experience for searching approved knowledge sources.

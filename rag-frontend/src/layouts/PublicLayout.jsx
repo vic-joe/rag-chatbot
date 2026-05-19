@@ -1,13 +1,11 @@
-import NavigationLink from "../components/NavigationLink.jsx";
-
 export default function PublicLayout({ children }) {
     return (
         <div className="public-shell">
-            <header className="public-header">
+            {/* <header className="public-header">
                 <NavigationLink to="/" className="brand-link">
                     <span className="brand-mark">R</span>
                     <span>
-                        <strong>RAG Assistant</strong>
+                        <strong>UDOM Chatbot</strong>
                         <small>Document intelligence</small>
                     </span>
                 </NavigationLink>
@@ -16,7 +14,7 @@ export default function PublicLayout({ children }) {
                     <NavigationLink to="/">Chat</NavigationLink>
                     <NavigationLink to="/about">About</NavigationLink>
                 </nav>
-            </header>
+            </header> */}
 
             <main>{children}</main>
         </div>

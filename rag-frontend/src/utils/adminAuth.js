@@ -45,6 +45,18 @@ export function getAdminToken() {
     return getAdminSession()?.token || "";
 }
 
+export function saveAdminSession(user) {
+    const session = {
+        id: user.id,
+        username: user.username,
+        role: "admin",
+        token: createJwtLikeToken(user),
+    };
+
+    window.localStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify(session));
+    return session;
+}
+
 export function isAdminAuthenticated() {
     const session = getAdminSession();
 
@@ -104,14 +116,11 @@ export async function loginAdmin(username, password) {
         throw new Error(formatAuthError(data));
     }
 
-    const session = {
-        id: data.id,
-        username: data.username,
-        token: createJwtLikeToken(data),
-    };
+    if (data.role !== "admin") {
+        throw new Error("This account does not have admin access.");
+    }
 
-    window.localStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify(session));
-    return session;
+    return saveAdminSession(data);
 }
 
 export function clearAdminSession() {
