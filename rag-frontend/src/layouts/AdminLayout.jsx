@@ -124,7 +124,7 @@ export default function AdminLayout({ children }) {
                             </button>
                         </div>
 
-                        <NavigationLink to="/" className="admin-public-link">
+                        <NavigationLink to="/" className="admin-public-link" onNavigate={clearAdminSession}>
                             Public site
                         </NavigationLink>
                     </div>

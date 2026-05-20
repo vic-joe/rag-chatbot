@@ -35,6 +35,22 @@ export default function LoginForm({ onLogin }) {
     const [isLoading, setIsLoading] = useState(false);
     const [focused, setFocused] = useState(null);
 
+    const handleChatLinkClick = (event) => {
+        if (
+            event.metaKey ||
+            event.ctrlKey ||
+            event.shiftKey ||
+            event.altKey ||
+            event.button !== 0
+        ) {
+            return;
+        }
+
+        event.preventDefault();
+        window.history.pushState({}, "", "/chat");
+        window.dispatchEvent(new PopStateEvent("popstate"));
+    };
+
     const handleSubmit = async (event) => {
         event.preventDefault();
         setError("");
@@ -140,6 +156,12 @@ export default function LoginForm({ onLogin }) {
                         )}
                     </button>
                 </form>
+
+                <div style={styles.chatLinkWrap}>
+                    <a href="/chat" style={styles.chatLink} onClick={handleChatLinkClick}>
+                        Continue to chat
+                    </a>
+                </div>
             </div>
         </div>
     );
@@ -294,5 +316,15 @@ const styles = {
         borderRadius: "50%",
         animation: "spin 0.8s linear infinite",
         display: "inline-block",
+    },
+    chatLinkWrap: {
+        marginTop: "18px",
+        textAlign: "center",
+    },
+    chatLink: {
+        color: "#9a4f35",
+        fontSize: "13px",
+        fontWeight: "700",
+        textDecoration: "none",
     },
 };
