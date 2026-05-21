@@ -95,7 +95,6 @@ export default function App() {
     const publicRoutes = {
         "/": <ChatPage />,
         "/chat": <ChatPage />,
-        "/about": <AboutPage />,
     };
 
     return (
