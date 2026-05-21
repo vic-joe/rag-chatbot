@@ -1,14 +1,14 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import "./App.css";
 import PublicLayout from "./layouts/PublicLayout.jsx";
 import AdminLayout from "./layouts/AdminLayout.jsx";
 import ChatPage from "./pages/ChatPage.jsx";
-import AboutPage from "./pages/AboutPage.jsx";
+// import AboutPage from "./pages/AboutPage.jsx";
 import AdminLoginPage from "./pages/AdminLoginPage.jsx";
 import RegisterPage from "./pages/RegisterPage.jsx";
 import AdminDashboardPage from "./pages/AdminDashboardPage.jsx";
 import ThemeToggle from "./components/ThemeToggle.jsx";
-import { isAdminAuthenticated } from "./utils/adminAuth.js";
+import { clearAdminSession, isAdminAuthenticated } from "./utils/adminAuth.js";
 
 function normalizePath(pathname) {
     if (pathname.length > 1 && pathname.endsWith("/")) {
@@ -37,6 +37,7 @@ function ProtectedAdminRoute({ children }) {
 
 export default function App() {
     const [path, setPath] = useState(() => normalizePath(window.location.pathname));
+    const pathRef = useRef(path);
     const [theme, setTheme] = useState(() => {
         const savedTheme = window.localStorage.getItem("udomTheme");
         if (savedTheme === "dark" || savedTheme === "light") return savedTheme;
@@ -44,7 +45,20 @@ export default function App() {
     });
 
     useEffect(() => {
-        const handlePopState = () => setPath(normalizePath(window.location.pathname));
+        pathRef.current = path;
+    }, [path]);
+
+    useEffect(() => {
+        const handlePopState = () => {
+            const nextPath = normalizePath(window.location.pathname);
+
+            if (pathRef.current === "/admin/dashboard" && nextPath !== "/admin/dashboard") {
+                clearAdminSession();
+            }
+
+            setPath(nextPath);
+        };
+
         window.addEventListener("popstate", handlePopState);
 
         return () => window.removeEventListener("popstate", handlePopState);
