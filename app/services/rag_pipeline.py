@@ -34,6 +34,35 @@ class RAGPipeline:
     def _should_fallback(self, answer: str) -> bool:
         return answer.strip() == self.document_refusal
 
+    def _retrieval_query(
+        self,
+        query: str,
+        chat_history: Optional[List[Dict[str, str]]] = None,
+    ) -> str:
+        """
+        Include recent turns in the embedding query so follow-up questions can
+        resolve references like "it", "that course", or "the second one".
+        """
+
+        history_lines = []
+
+        for item in (chat_history or [])[-8:]:
+            role = item.get("role")
+            content = item.get("content", "").strip()
+
+            if role in {"user", "assistant"} and content:
+                label = "User" if role == "user" else "Assistant"
+                history_lines.append(f"{label}: {content[:500]}")
+
+        if not history_lines:
+            return query
+
+        return (
+            "Recent conversation:\n"
+            f"{chr(10).join(history_lines)}\n\n"
+            f"Current question: {query}"
+        )
+
     def run(
         self,
         query: str,
@@ -52,7 +81,8 @@ class RAGPipeline:
                 "context_used": False
             }
 
-        retrieval_result = self.retrieval_service.get_context(query)
+        retrieval_query = self._retrieval_query(query, chat_history)
+        retrieval_result = self.retrieval_service.get_context(retrieval_query)
         context = retrieval_result["context"]
         documents = retrieval_result["documents"]
 
@@ -98,7 +128,8 @@ class RAGPipeline:
             yield self.greeting_response
             return
 
-        retrieval_result = self.retrieval_service.get_context(query)
+        retrieval_query = self._retrieval_query(query, chat_history)
+        retrieval_result = self.retrieval_service.get_context(retrieval_query)
         context = retrieval_result["context"]
 
         if self._is_empty_context(context):
@@ -138,7 +169,8 @@ class RAGPipeline:
                 }
             }
 
-        scored_docs = self.retrieval_service.retrieve_with_scores(query)
+        retrieval_query = self._retrieval_query(query, chat_history)
+        scored_docs = self.retrieval_service.retrieve_with_scores(retrieval_query)
 
         documents = []
         debug_info = []

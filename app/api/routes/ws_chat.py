@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
+from sqlalchemy.sql import func
 from sqlalchemy.orm import Session
 from typing import Dict, List
 
@@ -31,6 +32,8 @@ def save_chat_exchange(
 
     if session.title == "New chat":
         session.title = user_message[:80]
+
+    session.updated_at = func.now()
 
     db.commit()
     return True
