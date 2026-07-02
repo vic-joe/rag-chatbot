@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import MessageBubble, { TypingBubble } from "./MessageBubble";
 import ChatInput from "./ChatInput";
-import { useWebSocket } from "../../hooks/useWebSocket";
+import { useSSEChat } from "../../hooks/useSSEChat";
 import {
-    createChatSession, deleteChatSession, getChatSession, getChatSessions,
+    createChatSession, deleteChatSession, getChatSession, getChatSessions, changePassword, submitMessageFeedback
 } from "../../api/chatApi";
 import udomLogo from "../../assets/udom-logo.svg";
 
@@ -53,6 +53,12 @@ const LogOutIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
         <polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" />
+    </svg>
+);
+
+const KeyIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path>
     </svg>
 );
 const ChatLogo = () => (
@@ -111,6 +117,14 @@ export default function ChatWindow() {
     const [historyError, setHistoryError] = useState("");
     const messageListRef = useRef(null);
 
+    // Password Change State
+    const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+    const [pwdOld, setPwdOld] = useState("");
+    const [pwdNew, setPwdNew] = useState("");
+    const [pwdError, setPwdError] = useState("");
+    const [pwdSuccess, setPwdSuccess] = useState("");
+    const [isChangingPwd, setIsChangingPwd] = useState(false);
+
     const loadSessions = useCallback(async () => {
         if (!user) return;
         try {
@@ -122,22 +136,35 @@ export default function ChatWindow() {
         }
     }, [user]);
 
-    const handleSocketMessage = useCallback((data) => {
-        if (data.type === "stream") {
+    const handleSSEEvent = useCallback((event) => {
+        if (event.type === "stream") {
             setIsWaiting(false);
             setMessages((prev) => {
                 const last = prev[prev.length - 1];
                 if (last?.role === "assistant") {
-                    return [...prev.slice(0, -1), { ...last, content: last.content + data.token }];
+                    return [...prev.slice(0, -1), { ...last, content: last.content + event.token }];
                 }
-                return [...prev, { role: "assistant", content: data.token }];
+                return [...prev, { role: "assistant", content: event.token }];
             });
         }
-        if (data.type === "done") loadSessions();
-        if (data.type === "error") { setIsWaiting(false); setHistoryError(data.message); }
+        if (event.type === "done") {
+            setIsWaiting(false);
+            if (event.message_id) {
+                setMessages((prev) => {
+                    const next = [...prev];
+                    const lastMsg = next[next.length - 1];
+                    if (lastMsg && lastMsg.role === "assistant") {
+                        lastMsg.id = event.message_id;
+                    }
+                    return next;
+                });
+            }
+            loadSessions();
+        }
+        if (event.type === "error") { setIsWaiting(false); setHistoryError(event.message); }
     }, [loadSessions]);
 
-    const { sendMessage } = useWebSocket(user?.id ?? "guest", handleSocketMessage);
+    const { sendMessage } = useSSEChat(handleSSEEvent);
 
     useEffect(() => {
         const timer = window.setTimeout(() => loadSessions(), 0);
@@ -150,6 +177,35 @@ export default function ChatWindow() {
         setSessions([]);
         setActiveSessionId(null);
         setMessages([]);
+    };
+
+    const handleChangePasswordSubmit = async (e) => {
+        e.preventDefault();
+        setPwdError("");
+        setPwdSuccess("");
+        if (!pwdOld || !pwdNew) {
+            setPwdError("Please fill in both fields.");
+            return;
+        }
+        if (pwdNew.length < 6) {
+            setPwdError("New password must be at least 6 characters.");
+            return;
+        }
+        try {
+            setIsChangingPwd(true);
+            await changePassword(user.id, pwdOld, pwdNew);
+            setPwdSuccess("Password updated successfully.");
+            setPwdOld("");
+            setPwdNew("");
+            setTimeout(() => {
+                setIsPasswordModalOpen(false);
+                setPwdSuccess("");
+            }, 2000);
+        } catch (error) {
+            setPwdError(error.message || "Failed to update password.");
+        } finally {
+            setIsChangingPwd(false);
+        }
     };
 
     const handleNewChat = async () => {
@@ -169,10 +225,26 @@ export default function ChatWindow() {
         try {
             const session = await getChatSession(user.id, sessionId);
             setActiveSessionId(session.id);
-            setMessages(session.messages.map((m) => ({ role: m.role, content: m.content })));
+            setMessages(session.messages.map((m) => ({ id: m.id, role: m.role, content: m.content, feedback: m.feedback })));
             setHistoryError("");
         } catch (error) {
             setHistoryError(error.message);
+        }
+    };
+
+    const handleMessageFeedback = async (messageId, feedbackValue) => {
+        if (!user) return; // Only logged-in users can give feedback (since DB logic expects valid messages which are tied to sessions, which are tied to users)
+        
+        // Optimistic update
+        setMessages((prev) =>
+            prev.map((m) => (m.id === messageId ? { ...m, feedback: feedbackValue } : m))
+        );
+
+        try {
+            await submitMessageFeedback(messageId, feedbackValue);
+        } catch (error) {
+            console.error("Failed to submit feedback:", error);
+            // Revert on failure could be implemented here
         }
     };
 
@@ -207,7 +279,8 @@ export default function ChatWindow() {
                 return;
             }
         }
-        sendMessage(text, sessionId, recentHistory);
+        // Pass userId + sessionId so the SSE endpoint can persist the exchange
+        sendMessage(text, sessionId, user?.id ?? null, recentHistory);
     };
 
     useEffect(() => {
@@ -298,9 +371,14 @@ export default function ChatWindow() {
                                             <div style={styles.userAvatar}><UserIcon /></div>
                                             <span style={styles.userName}>{user.username}</span>
                                         </div>
-                                        <button type="button" style={styles.logoutBtn} onClick={handleLogout}>
-                                            <LogOutIcon />
-                                        </button>
+                                        <div style={{ display: 'flex', gap: '8px' }}>
+                                            <button type="button" style={styles.logoutBtn} onClick={() => setIsPasswordModalOpen(true)} title="Change Password">
+                                                <KeyIcon />
+                                            </button>
+                                            <button type="button" style={styles.logoutBtn} onClick={handleLogout} title="Log Out">
+                                                <LogOutIcon />
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             )}
@@ -380,7 +458,11 @@ export default function ChatWindow() {
                         </section>
                     ) : (
                         messages.map((m, i) => (
-                            <MessageBubble key={`${m.role}-${i}`} {...m} />
+                            <MessageBubble 
+                                key={`${m.role}-${i}`} 
+                                {...m} 
+                                onFeedback={handleMessageFeedback}
+                            />
                         ))
                     )}
 
@@ -389,6 +471,48 @@ export default function ChatWindow() {
 
                 {messages.length > 0 && <ChatInput onSend={handleSend} disabled={isWaiting} />}
             </div>
+
+            {/* Change Password Modal */}
+            {isPasswordModalOpen && (
+                <div style={styles.modalOverlay}>
+                    <div style={styles.modalContent}>
+                        <div style={styles.modalHeader}>
+                            <h3 style={styles.modalTitle}>Change Password</h3>
+                            <button type="button" style={styles.modalCloseBtn} onClick={() => setIsPasswordModalOpen(false)}>
+                                <XIcon />
+                            </button>
+                        </div>
+                        <form onSubmit={handleChangePasswordSubmit} style={styles.modalForm}>
+                            <input
+                                type="password"
+                                placeholder="Current Password"
+                                value={pwdOld}
+                                onChange={(e) => setPwdOld(e.target.value)}
+                                style={styles.modalInput}
+                                required
+                            />
+                            <input
+                                type="password"
+                                placeholder="New Password (min 6 chars)"
+                                value={pwdNew}
+                                onChange={(e) => setPwdNew(e.target.value)}
+                                style={styles.modalInput}
+                                required
+                            />
+                            {pwdError && <p style={styles.modalError}>{pwdError}</p>}
+                            {pwdSuccess && <p style={styles.modalSuccess}>{pwdSuccess}</p>}
+                            <div style={styles.modalActions}>
+                                <button type="button" onClick={() => setIsPasswordModalOpen(false)} style={styles.modalCancelBtn}>
+                                    Cancel
+                                </button>
+                                <button type="submit" disabled={isChangingPwd} style={styles.modalSubmitBtn}>
+                                    {isChangingPwd ? "Updating..." : "Update Password"}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
@@ -1345,5 +1469,103 @@ Object.assign(styles, {
         color: "#9a4f35",
         flexShrink: 0,
         display: "flex",
+    },
+    modalOverlay: {
+        position: "fixed",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: "rgba(0,0,0,0.5)",
+        backdropFilter: "blur(4px)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 1000,
+        padding: "20px",
+    },
+    modalContent: {
+        backgroundColor: "#131e2d",
+        border: "1px solid rgba(255,255,255,0.08)",
+        borderRadius: "16px",
+        padding: "24px",
+        width: "100%",
+        maxWidth: "400px",
+        boxShadow: "0 24px 48px rgba(0,0,0,0.4)",
+    },
+    modalHeader: {
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        marginBottom: "20px",
+    },
+    modalTitle: {
+        fontSize: "18px",
+        fontWeight: "600",
+        color: "#fff",
+        margin: 0,
+    },
+    modalCloseBtn: {
+        background: "none",
+        border: "none",
+        color: "#8a95a5",
+        cursor: "pointer",
+        display: "flex",
+        padding: "4px",
+        borderRadius: "6px",
+        transition: "all 0.2s",
+    },
+    modalForm: {
+        display: "flex",
+        flexDirection: "column",
+        gap: "16px",
+    },
+    modalInput: {
+        width: "100%",
+        backgroundColor: "#0f1923",
+        border: "1px solid rgba(255,255,255,0.1)",
+        color: "#fff",
+        padding: "12px 14px",
+        borderRadius: "8px",
+        fontSize: "14px",
+        outline: "none",
+        transition: "border-color 0.2s",
+    },
+    modalError: {
+        color: "#ff6b6b",
+        fontSize: "13px",
+        margin: 0,
+    },
+    modalSuccess: {
+        color: "#51cf66",
+        fontSize: "13px",
+        margin: 0,
+    },
+    modalActions: {
+        display: "flex",
+        justifyContent: "flex-end",
+        gap: "12px",
+        marginTop: "8px",
+    },
+    modalCancelBtn: {
+        padding: "10px 16px",
+        borderRadius: "8px",
+        background: "transparent",
+        color: "#fff",
+        border: "1px solid rgba(255,255,255,0.2)",
+        cursor: "pointer",
+        fontSize: "14px",
+        fontWeight: "500",
+    },
+    modalSubmitBtn: {
+        padding: "10px 16px",
+        borderRadius: "8px",
+        background: "#3b82f6",
+        color: "#fff",
+        border: "none",
+        cursor: "pointer",
+        fontSize: "14px",
+        fontWeight: "500",
+        transition: "background 0.2s",
     },
 });

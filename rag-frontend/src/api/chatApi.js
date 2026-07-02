@@ -70,6 +70,28 @@ export function loginUser(username, password) {
     });
 }
 
+export function changePassword(userId, oldPassword, newPassword) {
+    return request("/api/auth/change-password", {
+        method: "POST",
+        body: JSON.stringify({
+            user_id: userId,
+            old_password: oldPassword,
+            new_password: newPassword,
+        }),
+    });
+}
+
+export function submitMessageFeedback(messageId, feedbackValue) {
+    return request(`/api/chat/messages/${messageId}/feedback`, {
+        method: "POST",
+        body: JSON.stringify({ feedback: feedbackValue }),
+    });
+}
+
+export function getFeedbackMessages(skip = 0, limit = 100) {
+    return request(`/api/chat/feedback/messages?skip=${skip}&limit=${limit}`);
+}
+
 export function getChatSessions(userId) {
     return request(`/api/chat/users/${userId}/sessions`);
 }

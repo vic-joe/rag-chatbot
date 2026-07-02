@@ -1,22 +1,42 @@
-from typing import Optional
-
+from typing import Optional, List, Dict, Any
+from datetime import datetime
+from uuid import UUID
 from pydantic import BaseModel, Field
 
-
 class DocumentBase(BaseModel):
-    content: str = Field(..., min_length=1)
-    source: Optional[str] = None
+    title: Optional[str] = None
+    filename: Optional[str] = None
+    file_path: Optional[str] = None
+    category: Optional[str] = None
+    status: Optional[str] = "active"
 
 
 class DocumentCreate(DocumentBase):
-    pass
+    content: str = Field(..., min_length=1)  # manual entry will chunk this
 
 
-class DocumentUpdate(BaseModel):
+class DocumentUpdate(DocumentBase):
     content: Optional[str] = Field(default=None, min_length=1)
-    source: Optional[str] = None
 
 
 class DocumentResponse(DocumentBase):
     id: str
-    chunk_count: int = 1
+    uploaded_by: Optional[int] = None
+    upload_date: datetime
+    chunk_count: int = 0
+
+    class Config:
+        from_attributes = True
+
+
+class DocumentChunkResponse(BaseModel):
+    id: str
+    document_id: str
+    chunk_index: int
+    chunk_text: str
+    page_number: Optional[int] = None
+    metadata: Optional[Dict[str, Any]] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True

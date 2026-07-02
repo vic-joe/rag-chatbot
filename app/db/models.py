@@ -1,5 +1,5 @@
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, Text, text
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, Text, text, Boolean
+from sqlalchemy.dialects.postgresql import UUID, TSVECTOR, JSONB
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from pgvector.sqlalchemy import Vector
@@ -43,16 +43,51 @@ class ChatMessage(Base):
     session_id = Column(Integer, ForeignKey("chat_sessions.id", ondelete="CASCADE"), nullable=False, index=True)
     role = Column(Text, nullable=False)
     content = Column(Text, nullable=False)
+    feedback = Column(Integer, nullable=True)  # 1: Thumbs Up, -1: Thumbs Down
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     session = relationship("ChatSession", back_populates="messages")
 
 
-class Document(Base):
+class DocumentModel(Base):
     __tablename__ = "documents"
 
     id = Column(UUID(as_uuid=True), primary_key=True, index=True, server_default=text("gen_random_uuid()"))
-    content = Column(Text, nullable=False)
+    title = Column(Text, nullable=True)
+    filename = Column(Text, nullable=True)
+    file_path = Column(Text, nullable=True)
+    category = Column(Text, nullable=True)
+    uploaded_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    upload_date = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    status = Column(Text, nullable=True, default="active")
+
+    chunks = relationship("DocumentChunk", back_populates="document", cascade="all, delete-orphan")
+
+
+class DocumentChunk(Base):
+    __tablename__ = "document_chunks"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, index=True, server_default=text("gen_random_uuid()"))
+    document_id = Column(UUID(as_uuid=True), ForeignKey("documents.id", ondelete="CASCADE"), nullable=False, index=True)
+    chunk_index = Column(Integer, nullable=False)
+    chunk_text = Column(Text, nullable=False)
     embedding = Column(Vector(settings.EMBEDDING_DIMENSION), nullable=False)
-    source = Column(Text, nullable=True)
-    chunk_index = Column(Integer, nullable=True)
+    tsv = Column(TSVECTOR, nullable=True)
+    page_number = Column(Integer, nullable=True)
+    metadata_ = Column("metadata", JSONB, nullable=True)  # Using metadata_ to avoid conflict with SQLAlchemy Base.metadata
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    document = relationship("DocumentModel", back_populates="chunks")
+
+
+class SystemSetting(Base):
+    __tablename__ = "system_settings"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, index=True, server_default=text("gen_random_uuid()"))
+    key = Column(Text, unique=True, nullable=False, index=True)
+    value = Column(Text, nullable=False)
+    description = Column(Text, nullable=True)
+    category = Column(Text, nullable=True)
+    is_editable = Column(Boolean, default=True)
+    updated_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

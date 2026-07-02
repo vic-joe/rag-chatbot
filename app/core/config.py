@@ -18,8 +18,18 @@ class Settings(BaseSettings):
     CHAT_MODEL: str = "gpt-4o-mini"
     ADMIN_USERNAMES: str = "admin"
 
+    # --- Admin seed (used only by scripts/create_admin.py) ---
+    ADMIN_USERNAME: str = ""
+    ADMIN_PASSWORD: str = ""
+
     GROQ_API_KEY: str = ""
     GROQ_MODEL: str = "llama-3.3-70b-versatile"
+
+    # --- Hybrid Retrieval ---
+    DENSE_TOP_K: int = 20       # candidate pool from pgvector
+    SPARSE_TOP_K: int = 20      # candidate pool from FTS
+    RRF_K: int = 60             # RRF constant (higher = smoother rank decay)
+    HYBRID_TOP_K: int = 5       # final chunks passed to the LLM
 
     class Config:
         env_file = ".env"

@@ -3,6 +3,7 @@ import Dashboard from "../components/admin/Dashboard.jsx";
 import DocumentManager from "../components/admin/DocumentManager.jsx";
 import UploadCard from "../components/admin/UploadCard.jsx";
 import VectorStatus from "../components/admin/VectorStatus.jsx";
+import FeedbackViewer from "../components/admin/FeedbackViewer.jsx";
 import { getDocuments } from "../api/documentApi.js";
 
 function getCurrentSection() {
@@ -72,6 +73,7 @@ export default function AdminDashboardPage() {
             {section === "upload" && <UploadCard onUploaded={() => setRefreshKey((value) => value + 1)} />}
             {section === "documents" && <DocumentManager refreshKey={refreshKey} onChanged={() => setRefreshKey((value) => value + 1)} />}
             {section === "vector" && <VectorStatus stats={stats} documents={documents} />}
+            {section === "feedback" && <FeedbackViewer />}
         </div>
     );
 }

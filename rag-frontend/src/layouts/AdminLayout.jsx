@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import NavigationLink from "../components/NavigationLink.jsx";
 import { clearAdminSession, getAdminSession } from "../utils/adminAuth.js";
+import { changePassword } from "../api/chatApi.js";
 import udomLogo from "../assets/udom-logo.svg";
 
 const DashboardIcon = () => (
@@ -30,6 +31,12 @@ const VectorIcon = () => (
     </svg>
 );
 
+const MessageSquareIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+    </svg>
+);
+
 const UserIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" />
@@ -43,17 +50,32 @@ const LogoutIcon = () => (
     </svg>
 );
 
+const KeyIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path>
+    </svg>
+);
+
 const adminSections = [
     { id: "overview", label: "Dashboard", detail: "KPIs and system health", icon: <DashboardIcon /> },
     { id: "upload", label: "Upload", detail: "Add knowledge files", icon: <UploadIcon /> },
     { id: "documents", label: "Documents", detail: "Manage indexed content", icon: <DocumentIcon /> },
     { id: "vector", label: "Vector DB", detail: "Index status", icon: <VectorIcon /> },
+    { id: "feedback", label: "Feedback", detail: "User responses", icon: <MessageSquareIcon /> },
 ];
 
 export default function AdminLayout({ children }) {
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [currentSection, setCurrentSection] = useState(() => window.location.hash.replace("#", "") || "overview");
     const session = getAdminSession();
+
+    // Password Change State
+    const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+    const [pwdOld, setPwdOld] = useState("");
+    const [pwdNew, setPwdNew] = useState("");
+    const [pwdError, setPwdError] = useState("");
+    const [pwdSuccess, setPwdSuccess] = useState("");
+    const [isChangingPwd, setIsChangingPwd] = useState(false);
 
     useEffect(() => {
         const handleHashChange = () => {
@@ -68,6 +90,35 @@ export default function AdminLayout({ children }) {
         clearAdminSession();
         window.history.replaceState({}, "", "/login");
         window.dispatchEvent(new PopStateEvent("popstate"));
+    };
+
+    const handleChangePasswordSubmit = async (e) => {
+        e.preventDefault();
+        setPwdError("");
+        setPwdSuccess("");
+        if (!pwdOld || !pwdNew) {
+            setPwdError("Please fill in both fields.");
+            return;
+        }
+        if (pwdNew.length < 6) {
+            setPwdError("New password must be at least 6 characters.");
+            return;
+        }
+        try {
+            setIsChangingPwd(true);
+            await changePassword(session.id, pwdOld, pwdNew);
+            setPwdSuccess("Password updated successfully.");
+            setPwdOld("");
+            setPwdNew("");
+            setTimeout(() => {
+                setIsPasswordModalOpen(false);
+                setPwdSuccess("");
+            }, 2000);
+        } catch (error) {
+            setPwdError(error.message || "Failed to update password.");
+        } finally {
+            setIsChangingPwd(false);
+        }
     };
 
     return (
@@ -119,9 +170,14 @@ export default function AdminLayout({ children }) {
                                 <span className="admin-user-avatar"><UserIcon /></span>
                                 <span>{session?.username || "Admin"}</span>
                             </div>
-                            <button type="button" onClick={handleLogout} aria-label="Logout">
-                                <LogoutIcon />
-                            </button>
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                                <button type="button" onClick={() => setIsPasswordModalOpen(true)} aria-label="Change Password" title="Change Password">
+                                    <KeyIcon />
+                                </button>
+                                <button type="button" onClick={handleLogout} aria-label="Logout" title="Logout">
+                                    <LogoutIcon />
+                                </button>
+                            </div>
                         </div>
 
                         <NavigationLink to="/" className="admin-public-link" onNavigate={clearAdminSession}>
@@ -132,6 +188,59 @@ export default function AdminLayout({ children }) {
             </aside>
 
             <main className="admin-content">{children}</main>
+
+            {/* Change Password Modal using the same styles as ChatWindow for simplicity */}
+            {isPasswordModalOpen && (
+                <div style={{
+                    position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+                    backgroundColor: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    zIndex: 1000, padding: "20px"
+                }}>
+                    <div style={{
+                        backgroundColor: "#131e2d", border: "1px solid rgba(255,255,255,0.08)",
+                        borderRadius: "16px", padding: "24px", width: "100%", maxWidth: "400px",
+                        boxShadow: "0 24px 48px rgba(0,0,0,0.4)"
+                    }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "20px" }}>
+                            <h3 style={{ fontSize: "18px", fontWeight: "600", color: "#fff", margin: 0 }}>Change Password</h3>
+                            <button type="button" style={{ background: "none", border: "none", color: "#8a95a5", cursor: "pointer", display: "flex", padding: "4px", borderRadius: "6px" }} onClick={() => setIsPasswordModalOpen(false)}>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                    <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                                </svg>
+                            </button>
+                        </div>
+                        <form onSubmit={handleChangePasswordSubmit} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                            <input
+                                type="password"
+                                placeholder="Current Password"
+                                value={pwdOld}
+                                onChange={(e) => setPwdOld(e.target.value)}
+                                style={{ width: "100%", backgroundColor: "#0f1923", border: "1px solid rgba(255,255,255,0.1)", color: "#fff", padding: "12px 14px", borderRadius: "8px", fontSize: "14px", outline: "none" }}
+                                required
+                            />
+                            <input
+                                type="password"
+                                placeholder="New Password (min 6 chars)"
+                                value={pwdNew}
+                                onChange={(e) => setPwdNew(e.target.value)}
+                                style={{ width: "100%", backgroundColor: "#0f1923", border: "1px solid rgba(255,255,255,0.1)", color: "#fff", padding: "12px 14px", borderRadius: "8px", fontSize: "14px", outline: "none" }}
+                                required
+                            />
+                            {pwdError && <p style={{ color: "#ff6b6b", fontSize: "13px", margin: 0 }}>{pwdError}</p>}
+                            {pwdSuccess && <p style={{ color: "#51cf66", fontSize: "13px", margin: 0 }}>{pwdSuccess}</p>}
+                            <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px", marginTop: "8px" }}>
+                                <button type="button" onClick={() => setIsPasswordModalOpen(false)} style={{ padding: "10px 16px", borderRadius: "8px", background: "transparent", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", cursor: "pointer", fontSize: "14px", fontWeight: "500" }}>
+                                    Cancel
+                                </button>
+                                <button type="submit" disabled={isChangingPwd} style={{ padding: "10px 16px", borderRadius: "8px", background: "#3b82f6", color: "#fff", border: "none", cursor: "pointer", fontSize: "14px", fontWeight: "500" }}>
+                                    {isChangingPwd ? "Updating..." : "Update Password"}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

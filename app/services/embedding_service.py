@@ -13,6 +13,9 @@ class EmbeddingServiceError(RuntimeError):
         self.status_code = status_code
 
 
+from sqlalchemy.orm import Session
+from app.services.settings_service import SettingsService
+
 class EmbeddingService:
     """
     Handles all embedding operations for the RAG system.
@@ -21,9 +24,12 @@ class EmbeddingService:
     - Batch embedding
     """
 
-    def __init__(self):
+    def __init__(self, db: Session):
+        settings_svc = SettingsService(db)
+        
+        # Read from dynamic settings if available, else fallback to env config
         self.provider = settings.EMBEDDING_PROVIDER.lower()
-        self.model = settings.EMBEDDING_MODEL
+        self.model = settings_svc.get("embedding_model", settings.EMBEDDING_MODEL)
         self.dimension = settings.EMBEDDING_DIMENSION
         self.batch_size = max(settings.EMBEDDING_BATCH_SIZE, 1)
         self.client = None
@@ -221,17 +227,11 @@ class EmbeddingService:
 
 
 # ---------------------------------------
-# Singleton Instance (Recommended)
+# Convenience Functions (Backward Compatible but require db)
 # ---------------------------------------
-embedding_service = EmbeddingService()
+def get_embedding(text: str, db: Session) -> List[float]:
+    return EmbeddingService(db).embed(text)
 
 
-# ---------------------------------------
-# Convenience Functions (Backward Compatible)
-# ---------------------------------------
-def get_embedding(text: str) -> List[float]:
-    return embedding_service.embed(text)
-
-
-def get_embeddings(texts: List[str]) -> List[List[float]]:
-    return embedding_service.embed_batch(texts)
+def get_embeddings(texts: List[str], db: Session) -> List[List[float]]:
+    return EmbeddingService(db).embed_batch(texts)

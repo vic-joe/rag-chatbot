@@ -27,58 +27,32 @@ def init_db():
 
     with engine.begin() as conn:
         conn.execute(text("CREATE EXTENSION IF NOT EXISTS pgcrypto"))
-        embedding_dimension = conn.execute(
-            text(
-                """
-                SELECT atttypmod
-                FROM pg_attribute
-                WHERE attrelid = 'documents'::regclass
-                  AND attname = 'embedding'
-                  AND NOT attisdropped
-                """
-            )
-        ).scalar()
+        
+        # ── FTS trigger for document_chunks ──────────────────────────────
+        conn.execute(text(
+            """
+            CREATE OR REPLACE FUNCTION document_chunks_fts_update()
+            RETURNS trigger LANGUAGE plpgsql AS $$
+            BEGIN
+                NEW.tsv := to_tsvector('english', NEW.chunk_text);
+                RETURN NEW;
+            END;
+            $$
+            """
+        ))
 
-        if embedding_dimension and embedding_dimension != settings.EMBEDDING_DIMENSION:
-            raise RuntimeError(
-                f"documents.embedding is vector({embedding_dimension}), "
-                f"but EMBEDDING_DIMENSION is {settings.EMBEDDING_DIMENSION}. "
-                "Recreate the documents table or migrate/re-embed existing rows."
-            )
-
-        conn.execute(text("ALTER TABLE documents ADD COLUMN IF NOT EXISTS source TEXT"))
-        conn.execute(text("ALTER TABLE documents ADD COLUMN IF NOT EXISTS chunk_index INTEGER"))
-        conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT now() NOT NULL"))
-        conn.execute(text("ALTER TABLE chat_sessions ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT now() NOT NULL"))
-        conn.execute(text("ALTER TABLE chat_sessions ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT now() NOT NULL"))
-        conn.execute(text("ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT now() NOT NULL"))
-        conn.execute(
-            text(
-                """
-                DO $$
-                DECLARE
-                    id_type text;
-                BEGIN
-                    SELECT data_type
-                    INTO id_type
-                    FROM information_schema.columns
-                    WHERE table_name = 'documents'
-                      AND column_name = 'id';
-
-                    IF id_type = 'uuid' THEN
-                        ALTER TABLE documents
-                        ALTER COLUMN id SET DEFAULT gen_random_uuid();
-                    ELSE
-                        CREATE SEQUENCE IF NOT EXISTS documents_id_seq OWNED BY documents.id;
-                        ALTER TABLE documents
-                        ALTER COLUMN id SET DEFAULT nextval('documents_id_seq');
-                        PERFORM setval(
-                            'documents_id_seq',
-                            COALESCE((SELECT MAX(id) FROM documents), 0) + 1,
-                            false
-                        );
-                    END IF;
-                END $$;
-                """
-            )
-        )
+        conn.execute(text(
+            """
+            DROP TRIGGER IF EXISTS trg_document_chunks_fts ON document_chunks;
+            CREATE TRIGGER trg_document_chunks_fts
+                BEFORE INSERT OR UPDATE OF chunk_text
+                ON document_chunks
+                FOR EACH ROW
+                EXECUTE FUNCTION document_chunks_fts_update();
+            """
+        ))
+        
+        # ensure index exists
+        conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS idx_document_chunks_fts ON document_chunks USING GIN (tsv)"
+        ))

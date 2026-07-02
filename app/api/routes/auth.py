@@ -12,7 +12,7 @@ from app.core.security import (
 from app.core.config import settings
 from app.db.models import User
 from app.db.session import get_db
-from app.schemas.auth import AuthRequest, RegisterRequest, UserResponse
+from app.schemas.auth import AuthRequest, RegisterRequest, UserResponse, ChangePasswordRequest
 
 router = APIRouter()
 
@@ -74,3 +74,21 @@ def login(payload: AuthRequest, db: Session = Depends(get_db)):
         db.refresh(user)
 
     return serialize_user(user)
+
+
+@router.post("/change-password", response_model=dict)
+def change_password(payload: ChangePasswordRequest, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == payload.user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    password_is_valid = verify_password(payload.old_password, user.password_hash)
+    password_is_legacy_valid = verify_legacy_plaintext_password(payload.old_password, user.password_hash)
+
+    if not password_is_valid and not password_is_legacy_valid:
+        raise HTTPException(status_code=401, detail="Invalid old password")
+
+    user.password_hash = hash_password(payload.new_password)
+    db.commit()
+
+    return {"message": "Password updated successfully"}

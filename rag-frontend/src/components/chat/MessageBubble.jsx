@@ -11,7 +11,19 @@ const UserIcon = () => (
     </svg>
 );
 
-export default function MessageBubble({ role, content }) {
+const ThumbsUpIcon = ({ filled }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill={filled ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path>
+    </svg>
+);
+
+const ThumbsDownIcon = ({ filled }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill={filled ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"></path>
+    </svg>
+);
+
+export default function MessageBubble({ id, role, content, feedback, onFeedback }) {
     const isUser = role === "user";
 
     return (
@@ -27,6 +39,28 @@ export default function MessageBubble({ role, content }) {
                 <div style={{ ...styles.bubble, ...(isUser ? styles.bubbleUser : styles.bubbleAssistant) }}>
                     {content}
                 </div>
+                {!isUser && id && (
+                    <div style={styles.feedbackActions}>
+                        <button 
+                            type="button" 
+                            style={{ ...styles.feedbackBtn, ...(feedback === 1 ? styles.feedbackBtnActive : {}) }}
+                            onClick={() => onFeedback && onFeedback(id, feedback === 1 ? 0 : 1)}
+                            aria-label="Thumbs up"
+                            title="Helpful"
+                        >
+                            <ThumbsUpIcon filled={feedback === 1} />
+                        </button>
+                        <button 
+                            type="button" 
+                            style={{ ...styles.feedbackBtn, ...(feedback === -1 ? styles.feedbackBtnActive : {}) }}
+                            onClick={() => onFeedback && onFeedback(id, feedback === -1 ? 0 : -1)}
+                            aria-label="Thumbs down"
+                            title="Not helpful"
+                        >
+                            <ThumbsDownIcon filled={feedback === -1} />
+                        </button>
+                    </div>
+                )}
             </div>
 
             {isUser && (
@@ -153,6 +187,27 @@ const styles = {
         background: "#4a9080",
         display: "inline-block",
         animation: "typingBounce 1.2s ease-in-out infinite",
+    },
+    feedbackActions: {
+        display: "flex",
+        gap: "6px",
+        marginTop: "2px",
+        paddingLeft: "2px",
+    },
+    feedbackBtn: {
+        background: "transparent",
+        border: "none",
+        color: "#6f6a61",
+        cursor: "pointer",
+        padding: "4px",
+        borderRadius: "4px",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        transition: "color 0.2s, background 0.2s",
+    },
+    feedbackBtnActive: {
+        color: "#4a9080",
     },
 };
 

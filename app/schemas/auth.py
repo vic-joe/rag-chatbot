@@ -10,6 +10,12 @@ class RegisterRequest(AuthRequest):
     password: str = Field(..., min_length=6, max_length=200)
 
 
+class ChangePasswordRequest(BaseModel):
+    user_id: int
+    old_password: str = Field(..., min_length=1, max_length=200)
+    new_password: str = Field(..., min_length=6, max_length=200)
+
+
 class UserResponse(BaseModel):
     id: int
     username: str

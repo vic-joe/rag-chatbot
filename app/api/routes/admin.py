@@ -10,9 +10,11 @@ from app.utils.loaders import load_document
 from app.utils.chunking import split_text
 from app.core.config import settings
 from app.services.embedding_service import EmbeddingServiceError, get_embeddings
-from app.db.models import Document
+from app.db.models import DocumentModel, DocumentChunk
 from app.db.session import get_db
 from app.schemas.document import DocumentCreate, DocumentResponse, DocumentUpdate
+from app.services.settings_service import SettingsService
+from app.schemas.settings import SystemSettingResponse, SystemSettingUpdate
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -21,88 +23,60 @@ UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
-def serialize_document_group(documents: list[Document]) -> dict:
-    first_document = documents[0]
-    ordered_documents = sorted(
-        documents,
-        key=lambda document: document.chunk_index if document.chunk_index is not None else 0,
-    )
-
+def serialize_document(document: DocumentModel) -> dict:
     return {
-        "id": first_document.source or str(first_document.id),
-        "content": "\n\n".join(document.content for document in ordered_documents),
-        "source": first_document.source,
-        "chunk_count": len(documents),
+        "id": str(document.id),
+        "title": document.title,
+        "filename": document.filename,
+        "file_path": document.file_path,
+        "category": document.category,
+        "uploaded_by": document.uploaded_by,
+        "upload_date": document.upload_date,
+        "status": document.status,
+        "chunk_count": len(document.chunks),
+        # the frontend edit form expects content
+        "content": "\n\n".join(chunk.chunk_text for chunk in sorted(document.chunks, key=lambda c: c.chunk_index)),
     }
 
 
-def group_documents(documents: list[Document]) -> list[list[Document]]:
-    grouped: dict[str, list[Document]] = {}
-
-    for document in documents:
-        group_key = document.source or str(document.id)
-        grouped.setdefault(group_key, []).append(document)
-
-    return list(grouped.values())
-
-
-def get_document_group_or_404(document_id: str, db: Session) -> list[Document]:
+def get_document_or_404(document_id: str, db: Session) -> DocumentModel:
     try:
         row_id = UUID(document_id)
+        document = db.query(DocumentModel).filter(DocumentModel.id == row_id).first()
     except ValueError:
-        documents = (
-            db.query(Document)
-            .filter(Document.source == document_id)
-            .order_by(Document.chunk_index.asc().nullslast())
-            .all()
-        )
-    else:
-        document = db.query(Document).filter(Document.id == row_id).first()
-        if document:
-            if not document.source:
-                return [document]
-
-            documents = (
-                db.query(Document)
-                .filter(Document.source == document.source)
-                .order_by(Document.chunk_index.asc().nullslast())
-                .all()
-            )
-        else:
-            documents = (
-                db.query(Document)
-                .filter(Document.source == document_id)
-                .order_by(Document.chunk_index.asc().nullslast())
-                .all()
-            )
-
-    if not documents:
+        # fallback to finding by filename
+        document = db.query(DocumentModel).filter(DocumentModel.filename == document_id).first()
+        
+    if not document:
         raise HTTPException(status_code=404, detail="Document not found")
 
-    return documents
+    return document
 
 
-def rebuild_document_group(
-    documents: list[Document],
+def rebuild_document_chunks(
+    document: DocumentModel,
     content: str,
-    source: str | None,
     db: Session,
-) -> list[Document]:
+) -> None:
+    settings_svc = SettingsService(db)
+    chunk_size = settings_svc.get("chunk_size", settings.DOCUMENT_CHUNK_SIZE)
+    chunk_overlap = settings_svc.get("chunk_overlap", settings.DOCUMENT_CHUNK_OVERLAP)
+
     chunks = split_text(
         content,
-        chunk_size=settings.DOCUMENT_CHUNK_SIZE,
-        overlap=settings.DOCUMENT_CHUNK_OVERLAP,
+        chunk_size=chunk_size,
+        overlap=chunk_overlap,
     )
 
     if not chunks:
         raise HTTPException(status_code=400, detail="Text could not be chunked")
 
     try:
-        embeddings = get_embeddings(chunks)
+        embeddings = get_embeddings(chunks, db)
     except EmbeddingServiceError as e:
         raise HTTPException(status_code=e.status_code, detail=str(e))
     except Exception as e:
-        logger.exception("Embedding failed while rebuilding document")
+        logger.exception("Embedding failed while rebuilding document chunks")
         raise HTTPException(status_code=502, detail=f"Embedding service error: {str(e)}")
 
     if len(embeddings) != len(chunks):
@@ -111,20 +85,19 @@ def rebuild_document_group(
             detail="Embedding service returned an unexpected number of vectors",
         )
 
-    for document in documents:
-        db.delete(document)
+    # delete old chunks
+    db.query(DocumentChunk).filter(DocumentChunk.document_id == document.id).delete()
 
-    rebuilt_documents = [
-        Document(
-            content=chunk,
-            embedding=embedding,
-            source=source,
+    new_chunks = [
+        DocumentChunk(
+            document_id=document.id,
             chunk_index=i,
+            chunk_text=chunk,
+            embedding=embedding,
         )
         for i, (chunk, embedding) in enumerate(zip(chunks, embeddings))
     ]
-    db.add_all(rebuilt_documents)
-    return rebuilt_documents
+    db.add_all(new_chunks)
 
 
 # ---------------------------------------
@@ -132,18 +105,14 @@ def rebuild_document_group(
 # ---------------------------------------
 @router.get("/documents/", response_model=list[DocumentResponse])
 def list_documents(db: Session = Depends(get_db)):
-    documents = (
-        db.query(Document)
-        .order_by(Document.source.asc().nullslast(), Document.chunk_index.asc().nullslast())
-        .all()
-    )
-    return [serialize_document_group(group) for group in group_documents(documents)]
+    documents = db.query(DocumentModel).order_by(DocumentModel.upload_date.desc()).all()
+    return [serialize_document(doc) for doc in documents]
 
 
 @router.get("/documents/{document_id}", response_model=DocumentResponse)
 def read_document(document_id: str, db: Session = Depends(get_db)):
-    documents = get_document_group_or_404(document_id, db)
-    return serialize_document_group(documents)
+    document = get_document_or_404(document_id, db)
+    return serialize_document(document)
 
 
 @router.post("/documents/manual", response_model=DocumentResponse, status_code=201)
@@ -153,11 +122,19 @@ def create_document(payload: DocumentCreate, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Content cannot be empty")
 
     try:
-        source = payload.source or f"manual-{uuid4()}"
-        documents = rebuild_document_group([], content, source, db)
+        title = payload.title or f"manual-{uuid4()}"
+        document = DocumentModel(
+            title=title,
+            filename=payload.filename or title,
+            category=payload.category or "manual",
+            status=payload.status or "active"
+        )
+        db.add(document)
+        db.flush()
+        
+        rebuild_document_chunks(document, content, db)
         db.commit()
-        for document in documents:
-            db.refresh(document)
+        db.refresh(document)
     except HTTPException:
         db.rollback()
         raise
@@ -166,29 +143,31 @@ def create_document(payload: DocumentCreate, db: Session = Depends(get_db)):
         logger.exception("Database insert failed for manually created document")
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
-    return serialize_document_group(documents)
+    return serialize_document(document)
 
 
 @router.put("/documents/{document_id}", response_model=DocumentResponse)
 def update_document(document_id: str, payload: DocumentUpdate, db: Session = Depends(get_db)):
-    documents = get_document_group_or_404(document_id, db)
+    document = get_document_or_404(document_id, db)
     changes = payload.dict(exclude_unset=True)
 
+    if "title" in changes: document.title = changes["title"]
+    if "filename" in changes: document.filename = changes["filename"]
+    if "category" in changes: document.category = changes["category"]
+    if "status" in changes: document.status = changes["status"]
+
     content = changes.get("content")
-    if content is None:
-        content = serialize_document_group(documents)["content"]
-
-    content = content.strip()
-    if not content:
-        raise HTTPException(status_code=400, detail="Content cannot be empty")
-
-    source = changes.get("source", documents[0].source) or documents[0].source
+    if content is not None:
+        content = content.strip()
+        if not content:
+            raise HTTPException(status_code=400, detail="Content cannot be empty")
 
     try:
-        rebuilt_documents = rebuild_document_group(documents, content, source, db)
+        if content is not None:
+            rebuild_document_chunks(document, content, db)
+            
         db.commit()
-        for document in rebuilt_documents:
-            db.refresh(document)
+        db.refresh(document)
     except HTTPException:
         db.rollback()
         raise
@@ -197,16 +176,17 @@ def update_document(document_id: str, payload: DocumentUpdate, db: Session = Dep
         logger.exception("Database update failed for document %s", document_id)
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
-    return serialize_document_group(rebuilt_documents)
+    return serialize_document(document)
 
 
 @router.delete("/documents/{document_id}")
 def delete_document(document_id: str, db: Session = Depends(get_db)):
-    documents = get_document_group_or_404(document_id, db)
+    document = get_document_or_404(document_id, db)
+    
+    chunk_count = len(document.chunks)
 
     try:
-        for document in documents:
-            db.delete(document)
+        db.delete(document)
         db.commit()
     except Exception as e:
         db.rollback()
@@ -215,9 +195,27 @@ def delete_document(document_id: str, db: Session = Depends(get_db)):
 
     return {
         "message": "Document deleted successfully",
-        "id": str(document_id),
-        "chunks_deleted": len(documents),
+        "id": str(document.id),
+        "chunks_deleted": chunk_count,
     }
+
+
+# ---------------------------------------
+# Settings CRUD
+# ---------------------------------------
+@router.get("/settings/", response_model=list[SystemSettingResponse])
+def list_settings(db: Session = Depends(get_db)):
+    settings_svc = SettingsService(db)
+    return settings_svc.get_all()
+
+
+@router.put("/settings/{key}", response_model=SystemSettingResponse)
+def update_setting(key: str, payload: SystemSettingUpdate, db: Session = Depends(get_db)):
+    settings_svc = SettingsService(db)
+    try:
+        return settings_svc.update(key, payload.value)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
 
 # ---------------------------------------
@@ -256,13 +254,13 @@ async def upload_document(
     # Prevent overwrite (IMPORTANT)
     # ---------------------------------------
     file_path = os.path.join(UPLOAD_DIR, filename)
+    name_without_ext = os.path.splitext(filename)[0]
 
     if os.path.exists(file_path):
-        name_without_ext = os.path.splitext(filename)[0]
         copy_index = 1
 
         while os.path.exists(file_path):
-            suffix = "_copy" if copy_index == 1 else f"_copy{copy_index}"
+            suffix = f"_copy{copy_index}"
             filename = f"{name_without_ext}{suffix}.{file_ext}"
             file_path = os.path.join(UPLOAD_DIR, filename)
             copy_index += 1
@@ -292,10 +290,14 @@ async def upload_document(
     # ---------------------------------------
     extracted_at = time.perf_counter()
 
+    settings_svc = SettingsService(db)
+    chunk_size = settings_svc.get("chunk_size", settings.DOCUMENT_CHUNK_SIZE)
+    chunk_overlap = settings_svc.get("chunk_overlap", settings.DOCUMENT_CHUNK_OVERLAP)
+
     chunks = split_text(
         text,
-        chunk_size=settings.DOCUMENT_CHUNK_SIZE,
-        overlap=settings.DOCUMENT_CHUNK_OVERLAP,
+        chunk_size=chunk_size,
+        overlap=chunk_overlap,
     )
 
     if not chunks:
@@ -307,7 +309,7 @@ async def upload_document(
     chunked_at = time.perf_counter()
 
     try:
-        embeddings = get_embeddings(chunks)
+        embeddings = get_embeddings(chunks, db)
     except EmbeddingServiceError as e:
         logger.warning("Embedding failed for uploaded document %s: %s", filename, str(e))
         raise HTTPException(status_code=e.status_code, detail=str(e))
@@ -324,13 +326,23 @@ async def upload_document(
     embedded_at = time.perf_counter()
 
     try:
+        document = DocumentModel(
+            title=name_without_ext,
+            filename=filename,
+            file_path=file_path,
+            category=file_ext,
+            status="active"
+        )
+        db.add(document)
+        db.flush() # flush to get document.id
+        
         db.bulk_insert_mappings(
-            Document,
+            DocumentChunk,
             [
                 {
-                    "content": chunk,
+                    "document_id": document.id,
+                    "chunk_text": chunk,
                     "embedding": embedding,
-                    "source": filename,
                     "chunk_index": i,
                 }
                 for i, (chunk, embedding) in enumerate(zip(chunks, embeddings))

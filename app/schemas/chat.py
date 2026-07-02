@@ -5,6 +5,9 @@ from typing import List, Dict, Any, Optional
 class ChatRequest(BaseModel):
     message: str
     history: Optional[List[Dict[str, str]]] = None
+    # Optional: provided by the SSE stream endpoint to persist history
+    session_id: Optional[int] = None
+    user_id: Optional[int] = None
 
 
 class Source(BaseModel):
@@ -15,3 +18,7 @@ class Source(BaseModel):
 class ChatResponse(BaseModel):
     response: str
     sources: List[Source]
+
+
+class MessageFeedbackRequest(BaseModel):
+    feedback: int  # 1 for thumbs up, -1 for thumbs down, 0 to clear

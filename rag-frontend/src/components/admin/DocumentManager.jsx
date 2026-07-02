@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { deleteDocument, getDocuments, updateDocument } from "../../api/documentApi";
 
-const emptyForm = { content: "", source: "" };
+const emptyForm = { content: "", filename: "" };
 
 const RefreshIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -117,8 +117,8 @@ export default function DocumentManager({ refreshKey = 0, onChanged }) {
 
     const toPayload = () => {
         const payload = { content: form.content.trim() };
-        const source = form.source.trim();
-        if (source) payload.source = source;
+        const filename = form.filename.trim();
+        if (filename) payload.filename = filename;
         return payload;
     };
 
@@ -147,14 +147,14 @@ export default function DocumentManager({ refreshKey = 0, onChanged }) {
 
     const handleEdit = (doc) => {
         setEditingId(doc.id);
-        setForm({ content: doc.content, source: doc.source || "" });
+        setForm({ content: doc.content, filename: doc.filename || doc.title || "" });
         setStatus("");
         setStatusType("");
     };
 
     const handleDelete = async (doc) => {
         const confirmed = window.confirm(
-            `Delete "${doc.source || "this document"}"? This removes the whole document from search.`
+            `Delete "${doc.filename || doc.title || "this document"}"? This removes the whole document from search.`
         );
         if (!confirmed) return;
         try {
@@ -200,7 +200,7 @@ export default function DocumentManager({ refreshKey = 0, onChanged }) {
                         <div style={styles.editHeaderText}>
                             <span style={styles.eyebrow}>Edit Mode</span>
                             <h3 style={{ ...styles.editTitle, ...(isNarrow ? styles.editTitleNarrow : {}) }}>
-                                {selectedDocument?.source || "Manual Entry"}
+                                {selectedDocument?.filename || selectedDocument?.title || "Manual Entry"}
                                 {selectedDocument && (
                                     <span style={styles.chunksBadge}>
                                         {selectedDocument.chunk_count ?? 1} parts
@@ -233,18 +233,18 @@ export default function DocumentManager({ refreshKey = 0, onChanged }) {
                         </div>
 
                         <div style={styles.fieldGroup}>
-                            <label style={styles.label} htmlFor="dm-source">Source</label>
+                            <label style={styles.label} htmlFor="dm-filename">Filename</label>
                             <input
-                                id="dm-source"
-                                name="source"
-                                value={form.source}
+                                id="dm-filename"
+                                name="filename"
+                                value={form.filename}
                                 onChange={handleChange}
-                                onFocus={() => setFocused("source")}
+                                onFocus={() => setFocused("filename")}
                                 onBlur={() => setFocused(null)}
                                 placeholder="policy.pdf"
                                 style={{
                                     ...styles.input,
-                                    ...(focused === "source" ? styles.inputFocused : {}),
+                                    ...(focused === "filename" ? styles.inputFocused : {}),
                                 }}
                             />
                         </div>
@@ -277,7 +277,7 @@ export default function DocumentManager({ refreshKey = 0, onChanged }) {
                 <div style={{ ...styles.emptyEditor, ...(isNarrow ? styles.emptyEditorNarrow : {}) }}>
                     <div style={styles.emptyEditorIcon}><EditIcon /></div>
                     <h3 style={styles.emptyEditorTitle}>Select a document to edit</h3>
-                    <p style={styles.emptyEditorText}>Choose Edit on any document below to update its text or source label.</p>
+                    <p style={styles.emptyEditorText}>Choose Edit on any document below to update its text or filename.</p>
                 </div>
             )}
 
@@ -313,7 +313,7 @@ export default function DocumentManager({ refreshKey = 0, onChanged }) {
                                 <div style={styles.docRowMeta}>
                                     <span style={styles.docRowSource}>
                                         <FileTextIcon />
-                                        {doc.source || "Manual entry"}
+                                        {doc.filename || doc.title || "Manual entry"}
                                     </span>
                                     <span style={styles.docRowChunks}>
                                         {doc.chunk_count ?? 1} parts

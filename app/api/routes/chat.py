@@ -1,15 +1,19 @@
+import json
+import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
+from sqlalchemy import func
 from sqlalchemy.orm import Session, selectinload
 
-from app.schemas.chat import ChatRequest, ChatResponse
+from app.schemas.chat import ChatRequest, ChatResponse, MessageFeedbackRequest
 from app.schemas.history import ChatSessionCreate, ChatSessionDetail, ChatSessionResponse
 from app.services.rag_pipeline import RAGPipeline
 from app.api.deps import get_rag_pipeline
-from app.db.models import ChatSession, User
-from app.db.session import get_db
+from app.db.models import ChatMessage, ChatSession, User
+from app.db.session import get_db, SessionLocal
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 def get_user_or_404(user_id: int, db: Session) -> User:
@@ -117,26 +121,154 @@ def chat(
         )
 
 
-# ---------------------------------------
-# 2. Streaming Chat Endpoint (NEW)
-# ---------------------------------------
+# -----------------------------------------------------------------------
+# 2. SSE Streaming Chat Endpoint
+# -----------------------------------------------------------------------
 @router.post("/stream")
 async def chat_stream(
     request: ChatRequest,
-    rag_pipeline: RAGPipeline = Depends(get_rag_pipeline)
+    rag_pipeline: RAGPipeline = Depends(get_rag_pipeline),
 ):
     """
-    Streaming endpoint for real-time chat (used by frontend/WebSocket alternative)
-    """
+    Server-Sent Events (SSE) streaming endpoint.
 
+    Emits newline-delimited JSON events over text/event-stream:
+
+      data: {"type": "stream", "token": "hello"}\n\n
+      data: {"type": "done"}\n\n
+      data: {"type": "error", "message": "..."}\n\n
+
+    If `user_id` and `session_id` are provided the full exchange is
+    persisted to the database after the stream completes.
+    """
     if not request.message or not request.message.strip():
         raise HTTPException(status_code=400, detail="Message cannot be empty")
 
-    async def event_generator():
-        try:
-            async for token in rag_pipeline.stream(request.message, chat_history=request.history):
-                yield token
-        except Exception as e:
-            yield f"[ERROR]: {str(e)}"
+    async def event_stream():
+        full_response = ""
+        assistant_message_id = None
 
-    return StreamingResponse(event_generator(), media_type="text/plain")
+        try:
+            # ── Stream tokens from RAG pipeline ────────────────────────────
+            async for token in rag_pipeline.stream(
+                request.message,
+                chat_history=request.history,
+            ):
+                full_response += token
+                payload = json.dumps({"type": "stream", "token": token}, ensure_ascii=False)
+                yield f"data: {payload}\n\n"
+
+        except Exception as exc:
+            logger.exception("SSE stream error")
+            err_payload = json.dumps({"type": "error", "message": str(exc)})
+            yield f"data: {err_payload}\n\n"
+            return
+
+        # ── Persist to DB if caller supplied session context ────────────────
+        if request.user_id and request.session_id and full_response:
+            db: Session = SessionLocal()
+            try:
+                session = (
+                    db.query(ChatSession)
+                    .filter(
+                        ChatSession.id == request.session_id,
+                        ChatSession.user_id == request.user_id,
+                    )
+                    .first()
+                )
+                if session:
+                    user_msg = ChatMessage(
+                        session_id=request.session_id,
+                        role="user",
+                        content=request.message,
+                    )
+                    db.add(user_msg)
+                    
+                    asst_msg = ChatMessage(
+                        session_id=request.session_id,
+                        role="assistant",
+                        content=full_response,
+                    )
+                    db.add(asst_msg)
+                    
+                    if session.title == "New chat":
+                        session.title = request.message[:80]
+                    session.updated_at = func.now()
+                    db.commit()
+                    db.refresh(asst_msg)
+                    assistant_message_id = asst_msg.id
+            except Exception as exc:
+                logger.warning("SSE: failed to persist chat exchange: %s", exc)
+                db.rollback()
+            finally:
+                db.close()
+
+        # ── Signal completion ───────────────────────────────────────────────
+        yield f"data: {json.dumps({'type': 'done', 'message_id': assistant_message_id})}\n\n"
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",   # disable nginx buffering
+            "Connection": "keep-alive",
+        },
+    )
+
+
+@router.post("/messages/{message_id}/feedback")
+def submit_message_feedback(
+    message_id: int,
+    payload: MessageFeedbackRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Submit thumbs up (1) or thumbs down (-1) feedback for a specific chat message.
+    Pass 0 to clear feedback.
+    """
+    message = db.query(ChatMessage).filter(ChatMessage.id == message_id).first()
+    if not message:
+        raise HTTPException(status_code=404, detail="Message not found")
+        
+    if payload.feedback not in [-1, 0, 1]:
+        raise HTTPException(status_code=400, detail="Feedback must be -1, 0, or 1")
+        
+    message.feedback = payload.feedback if payload.feedback != 0 else None
+    db.commit()
+    
+    return {"status": "success", "message_id": message_id, "feedback": message.feedback}
+
+
+@router.get("/feedback/messages")
+def list_feedback_messages(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
+    db: Session = Depends(get_db)
+):
+    """
+    List messages that received feedback, for the admin dashboard.
+    """
+    messages = (
+        db.query(ChatMessage)
+        .options(selectinload(ChatMessage.session).selectinload(ChatSession.user))
+        .filter(ChatMessage.feedback.isnot(None))
+        .order_by(ChatMessage.created_at.desc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+    
+    result = []
+    for msg in messages:
+        result.append({
+            "id": msg.id,
+            "session_id": msg.session_id,
+            "user_id": msg.session.user_id if msg.session else None,
+            "username": msg.session.user.username if msg.session and msg.session.user else "Guest",
+            "role": msg.role,
+            "content": msg.content,
+            "feedback": msg.feedback,
+            "created_at": msg.created_at
+        })
+    return result
